@@ -149,6 +149,26 @@ describe Sinatra::ExchangeSchema do
         [].to_json
       end
 
+      endpoint :get, '/test_primitive_array' do
+        summary 'Primitive array response'
+        response 200, type: :string
+      end
+
+      endpoint :get, '/test_primitive_array_invalid' do
+        summary 'Invalid primitive array response'
+        response 200, type: :string
+      end
+
+      get '/test_primitive_array' do
+        content_type :json
+        %w[a b c].to_json
+      end
+
+      get '/test_primitive_array_invalid' do
+        content_type :json
+        [1, 2, 3].to_json
+      end
+
       get '/no_schema' do
         'ok'
       end
@@ -367,6 +387,29 @@ describe Sinatra::ExchangeSchema do
       it 'passes without error' do
         post '/test_empty_array_response', { name: 'hello' }.to_json, 'CONTENT_TYPE' => 'application/json'
         expect(last_response.status).to eq(200)
+      end
+    end
+  end
+
+  describe 'primitive type response validation' do
+    include Rack::Test::Methods
+
+    def app
+      test_app
+    end
+
+    context 'with valid primitive array response' do
+      it 'validates successfully' do
+        get '/test_primitive_array'
+        expect(last_response.status).to eq(200)
+      end
+    end
+
+    context 'with invalid primitive array response' do
+      it 'raises ResponseSchemaValidationError' do
+        expect do
+          get '/test_primitive_array_invalid'
+        end.to raise_error(Sinatra::ExchangeSchema::ResponseValidator::ResponseSchemaValidationError)
       end
     end
   end

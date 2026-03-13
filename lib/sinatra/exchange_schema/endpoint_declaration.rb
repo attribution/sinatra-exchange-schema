@@ -70,11 +70,17 @@ module Sinatra
       end
 
       # Define a JSON Schema for a response status code.
-      # The block is evaluated in the context of a ExchangeSchema::Builder.
-      def response(status_code, &block)
-        builder = Builder.new
-        builder.instance_eval(&block) if block
-        @response_schemas[status_code.to_i] = builder.to_json_schema
+      # When +type:+ is given, produces a simple type schema (e.g. { "type" => "string" }).
+      # Otherwise the block is evaluated in the context of a ExchangeSchema::Builder.
+      def response(status_code, type: nil, &block)
+        schema = if type
+          { 'type' => type.to_s }
+        else
+          builder = Builder.new
+          builder.instance_eval(&block) if block
+          builder.to_json_schema
+        end
+        @response_schemas[status_code.to_i] = schema
       end
 
       # Convert Sinatra-style path to a regex for matching requests.

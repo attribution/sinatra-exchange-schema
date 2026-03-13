@@ -37,6 +37,26 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
     end
   end
 
+  describe '#response with type: kwarg' do
+    it 'stores a string type schema' do
+      decl = described_class.new(:get, '/test')
+      decl.response(200, type: :string)
+      expect(decl.response_schemas[200]).to eq({ 'type' => 'string' })
+    end
+
+    it 'stores an array type schema' do
+      decl = described_class.new(:get, '/test')
+      decl.response(200, type: :array)
+      expect(decl.response_schemas[200]).to eq({ 'type' => 'array' })
+    end
+
+    it 'stores an integer type schema' do
+      decl = described_class.new(:get, '/test')
+      decl.response(200, type: :integer)
+      expect(decl.response_schemas[200]).to eq({ 'type' => 'integer' })
+    end
+  end
+
   describe '#matches?' do
     it 'checks both method and path' do
       decl = described_class.new(:post, '/v2/filters')
