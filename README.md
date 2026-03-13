@@ -57,6 +57,26 @@ post '/v2/widgets' do
 end
 ```
 
+### Primitive-Type Responses
+
+When an endpoint returns an array of primitives (strings, numbers, tuples) instead of objects, use `response` with the `items:` keyword argument instead of a block. The type describes each **item** in the array — the after-filter automatically unwraps arrays and validates each element individually.
+
+```ruby
+# Array of strings — e.g. ["key1", "key2", "key3"]
+endpoint :get, '/v2/properties' do
+  summary 'List property keys'
+  response 200, items: :string
+end
+
+# Array of arrays (tuples) — e.g. [["value", 1], ["other", 2]]
+endpoint :get, '/v2/properties/filtered/:key' do
+  summary 'Property values with counts'
+  response 200, items: :array
+end
+```
+
+Supported types: `:string`, `:integer`, `:number`, `:boolean`, `:array`.
+
 ### Query Parameters
 
 ```ruby
@@ -93,7 +113,7 @@ Supported schemes: `:bearer` (HTTP Bearer token). Use `:none` to mark an endpoin
 
 ## Schema Builder DSL
 
-The `body`, `query`, and `response` blocks use a builder DSL with these types:
+The `body`, `query`, and `response` blocks use a builder DSL with these types. (For `response`, you can also pass `items:` directly — see [Primitive-Type Responses](#primitive-type-responses) above.)
 
 | Method    | Options                                  |
 |-----------|------------------------------------------|

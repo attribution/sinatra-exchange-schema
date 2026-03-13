@@ -37,22 +37,22 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
     end
   end
 
-  describe '#response with type: kwarg' do
+  describe '#response with items: kwarg' do
     it 'stores a string type schema' do
       decl = described_class.new(:get, '/test')
-      decl.response(200, type: :string)
+      decl.response(200, items: :string)
       expect(decl.response_schemas[200]).to eq({ 'type' => 'string' })
     end
 
     it 'stores an array type schema' do
       decl = described_class.new(:get, '/test')
-      decl.response(200, type: :array)
+      decl.response(200, items: :array)
       expect(decl.response_schemas[200]).to eq({ 'type' => 'array' })
     end
 
     it 'stores an integer type schema' do
       decl = described_class.new(:get, '/test')
-      decl.response(200, type: :integer)
+      decl.response(200, items: :integer)
       expect(decl.response_schemas[200]).to eq({ 'type' => 'integer' })
     end
   end

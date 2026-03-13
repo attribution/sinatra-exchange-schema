@@ -151,12 +151,12 @@ describe Sinatra::ExchangeSchema do
 
       endpoint :get, '/test_primitive_array' do
         summary 'Primitive array response'
-        response 200, type: :string
+        response 200, items: :string
       end
 
       endpoint :get, '/test_primitive_array_invalid' do
         summary 'Invalid primitive array response'
-        response 200, type: :string
+        response 200, items: :string
       end
 
       get '/test_primitive_array' do

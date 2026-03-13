@@ -18,6 +18,13 @@
 #     end
 #   end
 #
+#   # For endpoints returning arrays of primitives, use items: instead of a block.
+#   # The type describes each array item; the after-filter unwraps and validates.
+#   endpoint :get, '/v2/properties' do
+#     summary 'List property keys'
+#     response 200, items: :string
+#   end
+#
 require 'json'
 require 'sinatra/base'
 require_relative 'exchange_schema/version'
