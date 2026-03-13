@@ -10,7 +10,8 @@ module Sinatra
   module ExchangeSchema
     class EndpointDeclaration
       AUTH_SCHEMES = {
-        'bearer' => { 'type' => 'http', 'scheme' => 'bearer' }
+        'bearer' => { 'type' => 'http', 'scheme' => 'bearer' },
+        'basic'  => { 'type' => 'http', 'scheme' => 'basic' }
       }.freeze
 
       attr_reader :http_method, :path,

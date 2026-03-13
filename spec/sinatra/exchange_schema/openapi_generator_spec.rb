@@ -136,6 +136,37 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
       )
     end
 
+    it 'derives security and securitySchemes from basic auth declarations' do
+      decl = build_declaration(:get, '/v2/stats', summary: 'Stats') do
+        security :basic
+      end
+
+      doc = described_class.call([decl])
+      expect(doc['security']).to eq([{ 'basic' => [] }])
+      expect(doc['components']['securitySchemes']['basic']).to eq(
+        { 'type' => 'http', 'scheme' => 'basic' }
+      )
+    end
+
+    it 'includes per-operation security when mixed auth schemes are used' do
+      bearer_decl = build_declaration(:get, '/v2/items', summary: 'List') do
+        security :bearer
+      end
+      basic_decl = build_declaration(:get, '/v2/stats', summary: 'Stats') do
+        security :basic
+      end
+
+      doc = described_class.call([bearer_decl, basic_decl])
+      expect(doc['components']['securitySchemes']).to have_key('bearer')
+      expect(doc['components']['securitySchemes']).to have_key('basic')
+
+      # Per-operation security should be present since each differs from top-level
+      bearer_op = doc['paths']['/v2/items']['get']
+      basic_op = doc['paths']['/v2/stats']['get']
+      expect(bearer_op['security']).to eq([{ 'bearer' => [] }])
+      expect(basic_op['security']).to eq([{ 'basic' => [] }])
+    end
+
     it 'omits security when no declarations have security' do
       doc = described_class.call([])
       expect(doc).not_to have_key('security')

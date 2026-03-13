@@ -57,6 +57,31 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
     end
   end
 
+  describe '#security' do
+    it 'sets bearer security' do
+      decl = described_class.new(:get, '/test')
+      decl.security(:bearer)
+      expect(decl.security).to eq([{ 'bearer' => [] }])
+    end
+
+    it 'sets basic security' do
+      decl = described_class.new(:get, '/test')
+      decl.security(:basic)
+      expect(decl.security).to eq([{ 'basic' => [] }])
+    end
+
+    it 'sets none security' do
+      decl = described_class.new(:get, '/test')
+      decl.security(:none)
+      expect(decl.security).to eq([])
+    end
+
+    it 'raises for unknown auth scheme' do
+      decl = described_class.new(:get, '/test')
+      expect { decl.security(:unknown) }.to raise_error(ArgumentError, /Unknown auth: unknown/)
+    end
+  end
+
   describe '#matches?' do
     it 'checks both method and path' do
       decl = described_class.new(:post, '/v2/filters')
