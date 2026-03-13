@@ -40,12 +40,13 @@ module Sinatra
           name = name.to_s
           prop = { 'type' => opts[:nullable] ? [type, 'null'] : type }
           prop['enum'] = opts[:enum] if opts[:enum]
+          prop['description'] = opts[:description] if opts[:description]
           @properties[name] = prop
           @required_fields << name if opts[:required]
         end
       end
 
-      def array(name, items: nil, required: false, nullable: false, &block)
+      def array(name, items: nil, required: false, nullable: false, description: nil, &block)
         name = name.to_s
         prop = { 'type' => nullable ? %w[array null] : 'array' }
         if block
@@ -55,15 +56,24 @@ module Sinatra
         elsif items
           prop['items'] = items
         end
+        prop['description'] = description if description
         @properties[name] = prop
         @required_fields << name if required
       end
 
-      def object(name, required: false, &block)
+      def object(name, required: false, nullable: false, description: nil, &block)
         name = name.to_s
-        nested = self.class.new
-        nested.instance_eval(&block)
-        @properties[name] = nested.to_json_schema
+        if block
+          nested = self.class.new
+          nested.instance_eval(&block)
+          schema = nested.to_json_schema
+          schema['description'] = description if description
+          @properties[name] = schema
+        else
+          prop = { 'type' => nullable ? %w[object null] : 'object' }
+          prop['description'] = description if description
+          @properties[name] = prop
+        end
         @required_fields << name if required
       end
 

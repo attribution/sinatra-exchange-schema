@@ -34,13 +34,14 @@ endpoint :post, '/v2/widgets' do
   summary 'Create a widget'
 
   body do
-    string  :name, required: true
+    string  :name, required: true, description: 'Full name of the widget'
     string  :status, enum: %w[active archived]
     integer :priority
     boolean :published, nullable: true
     object  :metadata do
       string :source
     end
+    object  :extra_options
     array :tags do
       string :value
     end
@@ -84,7 +85,7 @@ endpoint :get, '/v2/widgets' do
   summary 'List widgets'
 
   query do
-    string  :status, required: true, enum: %w[active archived]
+    string  :status, required: true, enum: %w[active archived], description: 'Filter by status'
     integer :page, nullable: true
     integer :per_page
   end
@@ -117,12 +118,12 @@ The `body`, `query`, and `response` blocks use a builder DSL with these types. (
 
 | Method    | Options                                  |
 |-----------|------------------------------------------|
-| `string`  | `required:`, `enum:`, `nullable:`        |
-| `integer` | `required:`, `enum:`, `nullable:`        |
-| `number`  | `required:`, `enum:`, `nullable:`        |
-| `boolean` | `required:`, `nullable:`                 |
-| `array`   | `required:`, `nullable:`, `items:`, block|
-| `object`  | `required:`, block                       |
+| `string`  | `required:`, `enum:`, `nullable:`, `description:` |
+| `integer` | `required:`, `enum:`, `nullable:`, `description:` |
+| `number`  | `required:`, `enum:`, `nullable:`, `description:` |
+| `boolean` | `required:`, `nullable:`, `description:`           |
+| `array`   | `required:`, `nullable:`, `items:`, `description:`, block |
+| `object`  | `required:`, `nullable:`, `description:`, block (optional) |
 
 ## Runtime Validation
 

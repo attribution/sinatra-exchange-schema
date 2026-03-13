@@ -87,6 +87,36 @@ describe Sinatra::ExchangeSchema::Builder do
     end
   end
 
+  describe 'description' do
+    it 'includes description on a scalar field' do
+      builder.string :name, description: 'Full name of the user'
+      expect(schema['properties']['name']).to eq(
+        'type' => 'string', 'description' => 'Full name of the user'
+      )
+    end
+
+    it 'includes description on an array field' do
+      builder.array :tags, items: { 'type' => 'string' }, description: 'List of tags'
+      expect(schema['properties']['tags']).to eq(
+        'type' => 'array', 'items' => { 'type' => 'string' }, 'description' => 'List of tags'
+      )
+    end
+
+    it 'includes description on an object field' do
+      builder.object :address, description: 'Mailing address' do
+        string :city
+      end
+      addr = schema['properties']['address']
+      expect(addr['description']).to eq('Mailing address')
+      expect(addr['type']).to eq('object')
+    end
+
+    it 'omits description when not provided' do
+      builder.string :name
+      expect(schema['properties']['name']).not_to have_key('description')
+    end
+  end
+
   describe 'nested object' do
     before do
       builder.object :address, required: true do
@@ -105,6 +135,16 @@ describe Sinatra::ExchangeSchema::Builder do
 
     it 'marks parent as required' do
       expect(schema['required']).to eq(['address'])
+    end
+
+    it 'compiles an opaque object without a block' do
+      builder.object :metadata
+      expect(schema['properties']['metadata']).to eq('type' => 'object')
+    end
+
+    it 'compiles a nullable opaque object' do
+      builder.object :metadata, nullable: true
+      expect(schema['properties']['metadata']).to eq('type' => %w[object null])
     end
   end
 end
