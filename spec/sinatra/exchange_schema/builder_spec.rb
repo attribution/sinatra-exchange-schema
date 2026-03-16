@@ -50,10 +50,17 @@ describe Sinatra::ExchangeSchema::Builder do
   end
 
   describe 'array type' do
-    it 'compiles a simple array' do
-      builder.array :tags, items: { 'type' => 'string' }
+    it 'compiles a simple array with symbol items' do
+      builder.array :tags, items: :string
       expect(schema['properties']['tags']).to eq(
         'type' => 'array', 'items' => { 'type' => 'string' }
+      )
+    end
+
+    it 'accepts a hash for items (backward compat)' do
+      builder.array :ids, items: { 'type' => 'integer' }
+      expect(schema['properties']['ids']).to eq(
+        'type' => 'array', 'items' => { 'type' => 'integer' }
       )
     end
 
@@ -96,7 +103,7 @@ describe Sinatra::ExchangeSchema::Builder do
     end
 
     it 'includes description on an array field' do
-      builder.array :tags, items: { 'type' => 'string' }, description: 'List of tags'
+      builder.array :tags, items: :string, description: 'List of tags'
       expect(schema['properties']['tags']).to eq(
         'type' => 'array', 'items' => { 'type' => 'string' }, 'description' => 'List of tags'
       )

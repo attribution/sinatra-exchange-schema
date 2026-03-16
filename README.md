@@ -78,6 +78,8 @@ end
 
 Supported types: `:string`, `:integer`, `:number`, `:boolean`, `:array`.
 
+The same symbol syntax works in the `array` field DSL inside `body`/`query`/`response` blocks — e.g. `array :tags, items: :string`.
+
 ### Query Parameters
 
 ```ruby

@@ -2,7 +2,7 @@
 # Used by EndpointDeclaration to define request body and query schemas inline.
 #
 # Scalar types: string, integer, number, boolean
-# Compound types: array (with +items+ block or hash), object (with nested block)
+# Compound types: array (with +items+ block, symbol, or hash), object (with nested block)
 #
 # == Usage
 #
@@ -54,7 +54,7 @@ module Sinatra
           nested.instance_eval(&block)
           prop['items'] = nested.to_json_schema
         elsif items
-          prop['items'] = items
+          prop['items'] = items.is_a?(Symbol) ? { 'type' => items.to_s } : items
         end
         prop['description'] = description if description
         @properties[name] = prop
