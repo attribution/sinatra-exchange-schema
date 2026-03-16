@@ -79,6 +79,7 @@ module Sinatra
       app.set :request_validation, nil
       app.set :response_validation, nil
       app.set :missing_schema, nil
+      app.set :openapi_file, nil
 
       app.before do
         declaration = self.class.endpoint_declarations.find do |decl|
@@ -211,6 +212,9 @@ module Sinatra
       decl.instance_eval(&block) if block
       if !decl.security && settings.respond_to?(:endpoint_security) && settings.endpoint_security
         decl.security(settings.endpoint_security)
+      end
+      if !decl.openapi_file && settings.respond_to?(:openapi_file) && settings.openapi_file
+        decl.openapi_file(settings.openapi_file)
       end
       endpoint_declarations << decl
     end

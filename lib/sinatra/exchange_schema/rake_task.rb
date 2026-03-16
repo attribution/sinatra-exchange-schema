@@ -34,13 +34,21 @@ module Sinatra
 
             app_class = app.is_a?(Proc) ? app.call : app
             declarations = app_class.endpoint_declarations
-            doc = OpenapiGenerator.call(declarations, info: info)
-
             output_path = output || ENV.fetch('OUTPUT', './openapi.yaml')
-            yaml = YAML.dump(doc).delete_prefix("---\n")
-            File.write(output_path, yaml)
+            output_dir = File.dirname(output_path)
+            default_file = File.basename(output_path)
 
-            puts "Wrote OpenAPI spec to #{output_path} (#{declarations.size} endpoints)"
+            # Group declarations by target file. Endpoints without an explicit
+            # openapi_file fall back to the default output filename.
+            groups = declarations.group_by { |d| d.openapi_file || default_file }
+
+            groups.each do |filename, group_decls|
+              doc = OpenapiGenerator.call(group_decls, info: info)
+              file_path = File.join(output_dir, filename)
+              yaml = YAML.dump(doc).delete_prefix("---\n")
+              File.write(file_path, yaml)
+              puts "Wrote OpenAPI spec to #{file_path} (#{group_decls.size} endpoints)"
+            end
           end
         end
       end

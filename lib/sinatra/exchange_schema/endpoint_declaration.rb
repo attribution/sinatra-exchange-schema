@@ -41,6 +41,12 @@ module Sinatra
         @response_validation = value
       end
 
+      def openapi_file(value = :_unset)
+        return @openapi_file if value == :_unset
+
+        @openapi_file = value
+      end
+
       def security(value = :_unset)
         return @security if value == :_unset
 

@@ -22,6 +22,9 @@ class App < Sinatra::Base
 
   # Optional: set a default auth scheme for all endpoints
   set :endpoint_security, :bearer
+
+  # Optional: route all endpoints in this controller to a separate OpenAPI file
+  set :openapi_file, 'admin.yaml'
 end
 ```
 
@@ -240,6 +243,14 @@ Options:
 | `info:`       | `{}`             | OpenAPI info (`title`, `version`, `description`) |
 | `output:`     | `./openapi.yaml` | Output file path (or `ENV['OUTPUT']`) |
 | `depends_on:` | `:environment`   | Rake task prerequisites            |
+
+### Multi-File Output
+
+By default every endpoint is written to the single output file (e.g. `openapi.yaml`). You can route endpoints to separate files with the `openapi_file` setting.
+
+You can override it per-controller (`set :openapi_file, 'admin.yaml'`) or per-endpoint (`openapi_file 'widgets.yaml'`).
+
+Precedence: **endpoint > controller > default "openapi.yaml"**.
 
 ### Programmatic
 

@@ -454,6 +454,46 @@ describe Sinatra::ExchangeSchema do
     end
   end
 
+  describe 'openapi_file propagation' do
+    it 'applies controller-level openapi_file to declarations' do
+      app_class = Class.new(Sinatra::Base) do
+        register Sinatra::ExchangeSchema
+        set :openapi_file, 'admin.yaml'
+
+        endpoint :get, '/admin' do
+          summary 'Admin endpoint'
+        end
+
+        get('/admin') { 'ok' }
+      end
+
+      decl = app_class.endpoint_declarations.find { |d| d.summary == 'Admin endpoint' }
+      expect(decl.openapi_file).to eq('admin.yaml')
+    end
+
+    it 'endpoint-level openapi_file overrides controller-level' do
+      app_class = Class.new(Sinatra::Base) do
+        register Sinatra::ExchangeSchema
+        set :openapi_file, 'admin.yaml'
+
+        endpoint :get, '/special' do
+          summary 'Special endpoint'
+          openapi_file 'special.yaml'
+        end
+
+        get('/special') { 'ok' }
+      end
+
+      decl = app_class.endpoint_declarations.find { |d| d.summary == 'Special endpoint' }
+      expect(decl.openapi_file).to eq('special.yaml')
+    end
+
+    it 'leaves openapi_file nil when no controller default set' do
+      decl = test_app.endpoint_declarations.find { |d| d.summary == 'Test endpoint' }
+      expect(decl.openapi_file).to be_nil
+    end
+  end
+
   describe 'missing endpoint schema detection' do
     include Rack::Test::Methods
 

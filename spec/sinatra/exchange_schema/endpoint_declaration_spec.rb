@@ -82,6 +82,19 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
     end
   end
 
+  describe '#openapi_file' do
+    it 'defaults to nil' do
+      decl = described_class.new(:get, '/test')
+      expect(decl.openapi_file).to be_nil
+    end
+
+    it 'stores the value' do
+      decl = described_class.new(:get, '/test')
+      decl.openapi_file('admin.yaml')
+      expect(decl.openapi_file).to eq('admin.yaml')
+    end
+  end
+
   describe '#matches?' do
     it 'checks both method and path' do
       decl = described_class.new(:post, '/v2/filters')
