@@ -18,7 +18,7 @@ module Sinatra
         return if errors.empty?
 
         errors.map do |err|
-          { field: err['data_pointer'], error: err['error'], type: err['type'] }
+          { field: err['data_pointer'], error: err['error'], type: err['type'], actual_value: err['data'] }
         end
       end
     end

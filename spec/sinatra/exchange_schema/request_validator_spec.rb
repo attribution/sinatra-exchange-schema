@@ -1,21 +1,19 @@
 require 'spec_helper'
 
-describe Sinatra::ExchangeSchema::ResponseValidator do
+describe Sinatra::ExchangeSchema::RequestValidator do
   let(:schema) do
     {
       'type' => 'object',
       'properties' => {
-        'id' => { 'type' => 'string' },
-        'name' => { 'type' => 'string' },
+        'filter_ids' => { 'type' => 'array', 'items' => { 'type' => 'object' } },
       },
-      'required' => ['id'],
     }
   end
 
   describe '.call' do
     context 'with a valid payload' do
       it 'returns nil' do
-        result = described_class.call({ 'id' => '1', 'name' => 'test' }, schema)
+        result = described_class.call({ 'filter_ids' => [{ 'id' => 1 }] }, schema)
         expect(result).to be_nil
       end
     end
@@ -29,10 +27,14 @@ describe Sinatra::ExchangeSchema::ResponseValidator do
 
     context 'with an invalid payload' do
       it 'returns an array of formatted errors with actual_value' do
-        result = described_class.call({ 'name' => 'test' }, schema)
+        result = described_class.call({ 'filter_ids' => [569804] }, schema)
         expect(result).to be_an(Array)
         expect(result).not_to be_empty
-        expect(result.first).to include(:field, :error, :type, :actual_value)
+        expect(result.first).to include(
+          field: '/filter_ids/0',
+          type: 'object',
+          actual_value: 569804
+        )
       end
     end
   end
