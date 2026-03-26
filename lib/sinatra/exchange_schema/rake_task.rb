@@ -40,7 +40,10 @@ module Sinatra
 
             # Group declarations by target file. Endpoints without an explicit
             # openapi_file fall back to the default output filename.
-            groups = declarations.group_by { |d| d.openapi_file || default_file }
+            # openapi_file false excludes the endpoint from all output files.
+            groups = declarations
+              .reject { |d| d.openapi_file == false }
+              .group_by { |d| d.openapi_file || default_file }
 
             groups.each do |filename, group_decls|
               doc = OpenapiGenerator.call(group_decls, info: info)

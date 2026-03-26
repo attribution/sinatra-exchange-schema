@@ -181,6 +181,35 @@ describe Sinatra::ExchangeSchema::RakeTask do
       end
     end
 
+    it 'excludes endpoints with openapi_file false from all output files' do
+      app = Class.new(Sinatra::Base) do
+        register Sinatra::ExchangeSchema
+
+        endpoint :get, '/v2/items' do
+          summary 'List items'
+        end
+
+        endpoint :get, '/robots.txt' do
+          summary 'Robots exclusion'
+          openapi_file false
+        end
+
+        get('/v2/items') { 'ok' }
+        get('/robots.txt') { 'ok' }
+      end
+
+      Dir.mktmpdir do |dir|
+        output_path = File.join(dir, 'openapi.yaml')
+        described_class.install(app: app, output: output_path, depends_on: [])
+
+        expect { Rake::Task['exchange_schema:openapi'].invoke }.to output(/Wrote OpenAPI spec/).to_stdout
+
+        content = YAML.safe_load(File.read(output_path))
+        expect(content['paths']).to have_key('/v2/items')
+        expect(content['paths']).not_to have_key('/robots.txt')
+      end
+    end
+
     it 'defaults to :environment prerequisite' do
       # Define a stub :environment task so Rake doesn't blow up
       Rake::Task.define_task(:environment)

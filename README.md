@@ -248,7 +248,7 @@ Options:
 
 By default every endpoint is written to the single output file (e.g. `openapi.yaml`). You can route endpoints to separate files with the `openapi_file` setting.
 
-You can override it per-controller (`set :openapi_file, 'admin.yaml'`) or per-endpoint (`openapi_file 'widgets.yaml'`).
+You can override it per-controller (`set :openapi_file, 'admin.yaml'`) or per-endpoint (`openapi_file 'widgets.yaml'`). Use `openapi_file false` to exclude an endpoint from all spec files entirely.
 
 Precedence: **endpoint > controller > default "openapi.yaml"**.
 
