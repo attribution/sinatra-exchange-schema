@@ -38,11 +38,14 @@ module Sinatra
       TYPES.each do |type|
         define_method(type) do |name, **opts|
           name = name.to_s
-          prop = { 'type' => opts[:nullable] ? [type, 'null'] : type }
+          existing_types = Array(@properties.dig(name, 'type'))
+          types = (existing_types.reject { |t| t == 'null' } + [type]).uniq
+          types += ['null'] if opts[:nullable] || existing_types.include?('null')
+          prop = (@properties[name] || {}).merge('type' => types.one? ? types.first : types)
           prop['enum'] = opts[:enum] if opts[:enum]
           prop['description'] = opts[:description] if opts[:description]
           @properties[name] = prop
-          @required_fields << name if opts[:required]
+          @required_fields << name if opts[:required] && !@required_fields.include?(name)
         end
       end
 

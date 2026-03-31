@@ -94,6 +94,38 @@ describe Sinatra::ExchangeSchema::Builder do
     end
   end
 
+  describe 'multi-type (same field declared twice)' do
+    it 'merges two types' do
+      builder.string :field
+      builder.boolean :field
+      expect(schema['properties']['field']).to eq('type' => %w[string boolean])
+    end
+
+    it 'preserves nullable from first declaration' do
+      builder.string :field, nullable: true
+      builder.boolean :field
+      expect(schema['properties']['field']).to eq('type' => %w[string boolean null])
+    end
+
+    it 'adds nullable from second declaration' do
+      builder.string :field
+      builder.boolean :field, nullable: true
+      expect(schema['properties']['field']).to eq('type' => %w[string boolean null])
+    end
+
+    it 'does not duplicate null' do
+      builder.string :field, nullable: true
+      builder.boolean :field, nullable: true
+      expect(schema['properties']['field']['type'].count('null')).to eq 1
+    end
+
+    it 'does not duplicate required' do
+      builder.string :field, required: true
+      builder.boolean :field, required: true
+      expect(schema['required']).to eq ['field']
+    end
+  end
+
   describe 'description' do
     it 'includes description on a scalar field' do
       builder.string :name, description: 'Full name of the user'
