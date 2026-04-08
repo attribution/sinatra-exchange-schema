@@ -90,6 +90,10 @@ module Sinatra
         env['endpoint_schema.declaration'] = declaration
 
         if declaration.body_schema && request.request_method != 'GET'
+          unless request.body.respond_to?(:pos)
+            logger.warn "Body schema validation skipped: rack.input (#{request.body.class}) is not seekable"
+            next
+          end
           begin
             request.body.rewind unless request.body.pos.zero?
             body_str = request.body.read

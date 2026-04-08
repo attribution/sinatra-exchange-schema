@@ -270,6 +270,43 @@ describe Sinatra::ExchangeSchema do
         expect(last_response.status).to eq(200)
       end
     end
+
+    context 'with Protocol::Rack::Input as the request body (Falcon server)' do
+      # Protocol::Rack::Input wraps async streaming I/O and has no pos method.
+      # Simulate it with a middleware that replaces rack.input before the app sees it.
+      let(:streaming_body) do
+        Class.new do
+          def initialize(str) = (@str = str)
+          def read(*)        = @str
+          def rewind         = nil
+        end
+      end
+
+      let(:app) do
+        klass = streaming_body
+        inner = test_app
+        Rack::Builder.new do
+          use(Class.new do
+            define_method(:initialize) { |app| @app = app }
+            define_method(:call) do |env|
+              env['rack.input'] = klass.new(env['rack.input'].read)
+              @app.call(env)
+            end
+          end)
+          run inner
+        end.to_app
+      end
+
+      it 'skips validation and does not raise NoMethodError' do
+        post '/test', { name: 'test' }.to_json, 'CONTENT_TYPE' => 'application/json'
+        expect(last_response.status).to eq 200
+      end
+
+      it 'skips validation even for an invalid body' do
+        post '/test', { count: 'not_a_number' }.to_json, 'CONTENT_TYPE' => 'application/json'
+        expect(last_response.status).to eq 200
+      end
+    end
   end
 
   describe 'after filter response validation' do
