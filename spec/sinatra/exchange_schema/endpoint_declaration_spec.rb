@@ -3,37 +3,37 @@ require 'spec_helper'
 describe Sinatra::ExchangeSchema::EndpointDeclaration do
   describe '#path_regex' do
     it 'matches a simple path exactly' do
-      decl = described_class.new(:get, '/v2/filters')
-      expect(decl.path_regex).to match('/v2/filters')
-      expect(decl.path_regex).not_to match('/v2/filters/extra')
-      expect(decl.path_regex).not_to match('/v2')
+      decl = described_class.new(:get, '/articles')
+      expect(decl.path_regex).to match('/articles')
+      expect(decl.path_regex).not_to match('/articles/extra')
+      expect(decl.path_regex).not_to match('/')
     end
 
     it 'captures path params' do
-      decl = described_class.new(:get, '/v2/filters/:filter_id')
-      match = decl.path_regex.match('/v2/filters/42')
+      decl = described_class.new(:get, '/articles/:id')
+      match = decl.path_regex.match('/articles/42')
       expect(match).not_to be_nil
-      expect(match[:filter_id]).to eq('42')
+      expect(match[:id]).to eq('42')
     end
 
     it 'escapes dots in static segments' do
-      decl = described_class.new(:get, '/v2/data.json')
-      expect(decl.path_regex).to match('/v2/data.json')
-      expect(decl.path_regex).not_to match('/v2/dataXjson')
+      decl = described_class.new(:get, '/data.json')
+      expect(decl.path_regex).to match('/data.json')
+      expect(decl.path_regex).not_to match('/dataXjson')
     end
 
     it 'escapes other metacharacters' do
-      decl = described_class.new(:get, '/v2/(special)')
-      expect(decl.path_regex).to match('/v2/(special)')
-      expect(decl.path_regex).not_to match('/v2/special')
+      decl = described_class.new(:get, '/(special)')
+      expect(decl.path_regex).to match('/(special)')
+      expect(decl.path_regex).not_to match('/special')
     end
 
     it 'handles multiple params' do
-      decl = described_class.new(:get, '/v2/projects/:project_id/filters/:filter_id')
-      match = decl.path_regex.match('/v2/projects/7/filters/42')
+      decl = described_class.new(:get, '/projects/:project_id/articles/:id')
+      match = decl.path_regex.match('/projects/7/articles/42')
       expect(match).not_to be_nil
       expect(match[:project_id]).to eq('7')
-      expect(match[:filter_id]).to eq('42')
+      expect(match[:id]).to eq('42')
     end
   end
 
@@ -83,14 +83,14 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
 
     it 'embeds scopes inside the security array' do
       decl = described_class.new(:get, '/test')
-      decl.security(:bearer, scopes: ['filters:read'])
-      expect(decl.security).to eq [{ 'bearer' => ['filters:read'] }]
+      decl.security(:bearer, scopes: ['articles:read'])
+      expect(decl.security).to eq [{ 'bearer' => ['articles:read'] }]
     end
 
     it 'embeds multiple scopes' do
       decl = described_class.new(:get, '/test')
-      decl.security(:bearer, scopes: ['reports:read', 'visitors:read'])
-      expect(decl.security).to eq [{ 'bearer' => ['reports:read', 'visitors:read'] }]
+      decl.security(:bearer, scopes: ['analytics:read', 'users:read'])
+      expect(decl.security).to eq [{ 'bearer' => ['analytics:read', 'users:read'] }]
     end
 
     it 'defaults to empty scopes when none given' do
@@ -108,8 +108,8 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
 
     it 'returns declared scopes' do
       decl = described_class.new(:get, '/test')
-      decl.security(:bearer, scopes: ['filters:read'])
-      expect(decl.scopes).to eq ['filters:read']
+      decl.security(:bearer, scopes: ['articles:read'])
+      expect(decl.scopes).to eq ['articles:read']
     end
   end
 
@@ -128,10 +128,10 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
 
   describe '#matches?' do
     it 'checks both method and path' do
-      decl = described_class.new(:post, '/v2/filters')
-      expect(decl.matches?('POST', '/v2/filters')).to be true
-      expect(decl.matches?('GET', '/v2/filters')).to be false
-      expect(decl.matches?('POST', '/v2/other')).to be false
+      decl = described_class.new(:post, '/articles')
+      expect(decl.matches?('POST', '/articles')).to be true
+      expect(decl.matches?('GET', '/articles')).to be false
+      expect(decl.matches?('POST', '/other')).to be false
     end
   end
 end

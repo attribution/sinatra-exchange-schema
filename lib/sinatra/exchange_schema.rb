@@ -10,8 +10,8 @@
 #
 #   set :endpoint_security, :bearer
 #
-#   endpoint :post, '/v2/widgets' do
-#     summary 'Create widget'
+#   endpoint :post, '/articles' do
+#     summary 'Create article'
 #     request_validation :strict
 #     body do
 #       string :name, required: true
@@ -20,8 +20,8 @@
 #
 #   # For endpoints returning arrays of primitives, use items: instead of a block.
 #   # The type describes each array item; the after-filter unwraps and validates.
-#   endpoint :get, '/v2/properties' do
-#     summary 'List property keys'
+#   endpoint :get, '/tags' do
+#     summary 'List tags'
 #     response 200, items: :string
 #   end
 #

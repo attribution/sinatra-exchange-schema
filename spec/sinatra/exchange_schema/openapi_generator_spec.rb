@@ -20,7 +20,7 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
     end
 
     it 'converts GET with query params' do
-      decl = build_declaration(:get, '/v2/items', summary: 'List items') do
+      decl = build_declaration(:get, '/items', summary: 'List items') do
         query do
           string :status, enum: %w[active archived], required: true
           integer :page
@@ -28,7 +28,7 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
       end
 
       doc = described_class.call([decl])
-      op = doc['paths']['/v2/items']['get']
+      op = doc['paths']['/items']['get']
 
       expect(op['summary']).to eq('List items')
       expect(op['parameters'].size).to eq(2)
@@ -44,7 +44,7 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
     end
 
     it 'converts POST with body schema' do
-      decl = build_declaration(:post, '/v2/items', summary: 'Create item') do
+      decl = build_declaration(:post, '/items', summary: 'Create item') do
         body do
           string :name, required: true
           integer :quantity
@@ -52,37 +52,37 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
       end
 
       doc = described_class.call([decl])
-      op = doc['paths']['/v2/items']['post']
+      op = doc['paths']['/items']['post']
 
       expect(op['requestBody']['content']['application/json']['schema']).to eq(decl.body_schema)
     end
 
     it 'extracts path params and converts Sinatra paths' do
-      decl = build_declaration(:get, '/v2/filters/:filter_id', summary: 'Get filter')
+      decl = build_declaration(:get, '/articles/:article_id', summary: 'Get filter')
 
       doc = described_class.call([decl])
 
-      expect(doc['paths']).to have_key('/v2/filters/{filter_id}')
-      op = doc['paths']['/v2/filters/{filter_id}']['get']
+      expect(doc['paths']).to have_key('/articles/{article_id}')
+      op = doc['paths']['/articles/{article_id}']['get']
 
-      path_param = op['parameters'].find { |p| p['name'] == 'filter_id' }
+      path_param = op['parameters'].find { |p| p['name'] == 'article_id' }
       expect(path_param['in']).to eq('path')
       expect(path_param['required']).to eq(true)
       expect(path_param['schema']['type']).to eq('integer')
     end
 
     it 'infers string type for path params not ending in _id' do
-      decl = build_declaration(:get, '/v2/items/:slug', summary: 'Get by slug')
+      decl = build_declaration(:get, '/items/:slug', summary: 'Get by slug')
 
       doc = described_class.call([decl])
-      op = doc['paths']['/v2/items/{slug}']['get']
+      op = doc['paths']['/items/{slug}']['get']
 
       slug_param = op['parameters'].find { |p| p['name'] == 'slug' }
       expect(slug_param['schema']['type']).to eq('string')
     end
 
     it 'maps response schemas with status codes' do
-      decl = build_declaration(:post, '/v2/items', summary: 'Create') do
+      decl = build_declaration(:post, '/items', summary: 'Create') do
         response 200 do
           string :id, required: true
         end
@@ -92,7 +92,7 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
       end
 
       doc = described_class.call([decl])
-      responses = doc['paths']['/v2/items']['post']['responses']
+      responses = doc['paths']['/items']['post']['responses']
 
       expect(responses).to have_key('200')
       expect(responses['200']['description']).to eq('OK')
@@ -103,20 +103,20 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
     end
 
     it 'returns default 200 response for endpoints without response schemas' do
-      decl = build_declaration(:get, '/v2/ping', summary: 'Ping')
+      decl = build_declaration(:get, '/ping', summary: 'Ping')
 
       doc = described_class.call([decl])
-      responses = doc['paths']['/v2/ping']['get']['responses']
+      responses = doc['paths']['/ping']['get']['responses']
 
       expect(responses).to eq({ '200' => { 'description' => 'OK' } })
     end
 
     it 'merges multiple methods on the same path' do
-      get_decl = build_declaration(:get, '/v2/filters/:filter_id', summary: 'Get filter')
-      delete_decl = build_declaration(:delete, '/v2/filters/:filter_id', summary: 'Delete filter')
+      get_decl = build_declaration(:get, '/articles/:article_id', summary: 'Get filter')
+      delete_decl = build_declaration(:delete, '/articles/:article_id', summary: 'Delete filter')
 
       doc = described_class.call([get_decl, delete_decl])
-      path_item = doc['paths']['/v2/filters/{filter_id}']
+      path_item = doc['paths']['/articles/{article_id}']
 
       expect(path_item).to have_key('get')
       expect(path_item).to have_key('delete')
@@ -125,7 +125,7 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
     end
 
     it 'derives security and securitySchemes from declarations' do
-      decl = build_declaration(:get, '/v2/items', summary: 'List') do
+      decl = build_declaration(:get, '/items', summary: 'List') do
         security :bearer
       end
 
@@ -137,7 +137,7 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
     end
 
     it 'derives security and securitySchemes from basic auth declarations' do
-      decl = build_declaration(:get, '/v2/stats', summary: 'Stats') do
+      decl = build_declaration(:get, '/stats', summary: 'Stats') do
         security :basic
       end
 
@@ -149,10 +149,10 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
     end
 
     it 'includes per-operation security when mixed auth schemes are used' do
-      bearer_decl = build_declaration(:get, '/v2/items', summary: 'List') do
+      bearer_decl = build_declaration(:get, '/items', summary: 'List') do
         security :bearer
       end
-      basic_decl = build_declaration(:get, '/v2/stats', summary: 'Stats') do
+      basic_decl = build_declaration(:get, '/stats', summary: 'Stats') do
         security :basic
       end
 
@@ -161,8 +161,8 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
       expect(doc['components']['securitySchemes']).to have_key('basic')
 
       # Per-operation security should be present since each differs from top-level
-      bearer_op = doc['paths']['/v2/items']['get']
-      basic_op = doc['paths']['/v2/stats']['get']
+      bearer_op = doc['paths']['/items']['get']
+      basic_op = doc['paths']['/stats']['get']
       expect(bearer_op['security']).to eq([{ 'bearer' => [] }])
       expect(basic_op['security']).to eq([{ 'basic' => [] }])
     end
@@ -174,51 +174,51 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
     end
 
     it 'omits per-operation security when it matches top-level default' do
-      decl = build_declaration(:get, '/v2/items', summary: 'List') do
+      decl = build_declaration(:get, '/items', summary: 'List') do
         security :bearer
       end
 
       doc = described_class.call([decl])
-      op = doc['paths']['/v2/items']['get']
+      op = doc['paths']['/items']['get']
       expect(op).not_to have_key('security')
     end
 
     it 'includes per-operation security override for :none' do
-      secured = build_declaration(:get, '/v2/items', summary: 'List') do
+      secured = build_declaration(:get, '/items', summary: 'List') do
         security :bearer
       end
-      public_decl = build_declaration(:get, '/v2/public', summary: 'Public') do
+      public_decl = build_declaration(:get, '/public', summary: 'Public') do
         security :none
       end
 
       doc = described_class.call([secured, public_decl])
-      op = doc['paths']['/v2/public']['get']
+      op = doc['paths']['/public']['get']
       expect(op['security']).to eq([])
     end
 
     it 'emits per-operation security with scopes when declared' do
-      decl = build_declaration(:get, '/v2/filters', summary: 'List') do
-        security :bearer, scopes: ['filters:read']
+      decl = build_declaration(:get, '/articles', summary: 'List') do
+        security :bearer, scopes: ['articles:read']
       end
 
       doc = described_class.call([decl])
-      op = doc['paths']['/v2/filters']['get']
-      expect(op['security']).to eq [{ 'bearer' => ['filters:read'] }]
+      op = doc['paths']['/articles']['get']
+      expect(op['security']).to eq [{ 'bearer' => ['articles:read'] }]
     end
 
     it 'omits per-operation security when endpoint has no scopes and matches top-level' do
-      decl = build_declaration(:get, '/v2/filters', summary: 'List') do
+      decl = build_declaration(:get, '/articles', summary: 'List') do
         security :bearer
       end
 
       doc = described_class.call([decl])
-      op = doc['paths']['/v2/filters']['get']
+      op = doc['paths']['/articles']['get']
       expect(op).not_to have_key('security')
     end
 
     it 'top-level security always has empty scopes regardless of per-endpoint scopes' do
-      decl = build_declaration(:get, '/v2/filters', summary: 'List') do
-        security :bearer, scopes: ['filters:read']
+      decl = build_declaration(:get, '/articles', summary: 'List') do
+        security :bearer, scopes: ['articles:read']
       end
 
       doc = described_class.call([decl])

@@ -33,11 +33,11 @@ end
 Place `endpoint` blocks above your route handlers. The block accepts `summary`, `body`, `query`, `response`, and `security` directives.
 
 ```ruby
-endpoint :post, '/v2/widgets' do
-  summary 'Create a widget'
+endpoint :post, '/articles' do
+  summary 'Create an article'
 
   body do
-    string  :name, required: true, description: 'Full name of the widget'
+    string  :name, required: true, description: 'Title of the article'
     string  :status, enum: %w[active archived]
     integer :priority
     boolean :published, nullable: true
@@ -56,7 +56,7 @@ endpoint :post, '/v2/widgets' do
   end
 end
 
-post '/v2/widgets' do
+post '/articles' do
   # ...
 end
 ```
@@ -67,14 +67,14 @@ When an endpoint returns an array of primitives (strings, numbers, tuples) inste
 
 ```ruby
 # Array of strings — e.g. ["key1", "key2", "key3"]
-endpoint :get, '/v2/properties' do
-  summary 'List property keys'
+endpoint :get, '/tags' do
+  summary 'List tags'
   response 200, items: :string
 end
 
 # Array of arrays (tuples) — e.g. [["value", 1], ["other", 2]]
-endpoint :get, '/v2/properties/filtered/:key' do
-  summary 'Property values with counts'
+endpoint :get, '/tags/filtered/:key' do
+  summary 'Tag values with counts'
   response 200, items: :array
 end
 ```
@@ -86,8 +86,8 @@ The same symbol syntax works in the `array` field DSL inside `body`/`query`/`res
 ### Query Parameters
 
 ```ruby
-endpoint :get, '/v2/widgets' do
-  summary 'List widgets'
+endpoint :get, '/articles' do
+  summary 'List articles'
 
   query do
     string  :status, required: true, enum: %w[active archived], description: 'Filter by status'
@@ -96,7 +96,7 @@ endpoint :get, '/v2/widgets' do
   end
 
   response 200 do
-    array :widgets, required: true do
+    array :articles, required: true do
       integer :id, required: true
       string  :name
     end
@@ -110,7 +110,7 @@ A default security scheme can be set at the app level with `set :endpoint_securi
 
 ```ruby
 # Public endpoint — no auth required
-endpoint :get, '/v2/health' do
+endpoint :get, '/health' do
   security :none
 end
 ```
@@ -172,7 +172,7 @@ end
 **Per-endpoint** — overrides both app-wide and controller settings for one route:
 
 ```ruby
-endpoint :post, '/v2/widgets' do
+endpoint :post, '/articles' do
   request_validation :strict
   response_validation :off
   body do
@@ -248,7 +248,7 @@ Options:
 
 By default every endpoint is written to the single output file (e.g. `openapi.yaml`). You can route endpoints to separate files with the `openapi_file` setting.
 
-You can override it per-controller (`set :openapi_file, 'admin.yaml'`) or per-endpoint (`openapi_file 'widgets.yaml'`). Use `openapi_file false` to exclude an endpoint from all spec files entirely.
+You can override it per-controller (`set :openapi_file, 'admin.yaml'`) or per-endpoint (`openapi_file 'articles.yaml'`). Use `openapi_file false` to exclude an endpoint from all spec files entirely.
 
 Precedence: **endpoint > controller > default "openapi.yaml"**.
 

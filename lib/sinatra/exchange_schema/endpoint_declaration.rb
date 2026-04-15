@@ -60,7 +60,7 @@ module Sinatra
                     end
       end
 
-      # Returns the OAuth scopes declared for this endpoint (e.g. ['filters:read']).
+      # Returns the OAuth scopes declared for this endpoint (e.g. ['articles:read']).
       # Extracted from the security array; empty when no scopes are declared.
       def scopes
         @security&.flat_map(&:values)&.flatten || []
@@ -97,11 +97,11 @@ module Sinatra
       end
 
       # Convert Sinatra-style path to a regex for matching requests.
-      # Path params like +:filter_id+ become named capture groups.
+      # Path params like +:article_id+ become named capture groups.
       def path_regex
         @path_regex ||= begin
           # Escape dots in static segments:
-          # "/v2/data.json/:id" => \A/v2/data\.json/(?<id>[^/]+)\z
+          # "/data.json/:id" => \A/data\.json/(?<id>[^/]+)\z
           parts = path.split(/:(\w+)/)
           pattern = parts.each_slice(2).map do |static, param|
             escaped = Regexp.escape(static)

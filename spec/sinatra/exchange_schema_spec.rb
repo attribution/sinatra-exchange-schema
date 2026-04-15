@@ -914,7 +914,7 @@ describe Sinatra::ExchangeSchema do
 
         endpoint :get, '/scoped' do
           summary 'Scoped endpoint'
-          security :bearer, scopes: ['filters:read']
+          security :bearer, scopes: ['articles:read']
         end
 
         get '/scoped' do
@@ -936,7 +936,7 @@ describe Sinatra::ExchangeSchema do
     it 'returns the matched EndpointDeclaration' do
       get '/scoped'
       expect(captured.first).to be_a Sinatra::ExchangeSchema::EndpointDeclaration
-      expect(captured.first.scopes).to eq ['filters:read']
+      expect(captured.first.scopes).to eq ['articles:read']
     end
 
     it 'returns nil for unregistered routes' do

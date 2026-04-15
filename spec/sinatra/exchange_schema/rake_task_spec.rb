@@ -11,11 +11,11 @@ describe Sinatra::ExchangeSchema::RakeTask do
     Class.new(Sinatra::Base) do
       register Sinatra::ExchangeSchema
 
-      endpoint :get, '/v2/items' do
+      endpoint :get, '/items' do
         summary 'List items'
       end
 
-      get('/v2/items') { 'ok' }
+      get('/items') { 'ok' }
     end
   end
 
@@ -44,7 +44,7 @@ describe Sinatra::ExchangeSchema::RakeTask do
         expect(content['openapi']).to eq('3.0.0')
         expect(content['info']['title']).to eq('Test API')
         expect(content['info']['version']).to eq('2.0')
-        expect(content['paths']).to have_key('/v2/items')
+        expect(content['paths']).to have_key('/items')
       end
     end
 
@@ -65,7 +65,7 @@ describe Sinatra::ExchangeSchema::RakeTask do
         expect(called).to be true
 
         content = YAML.safe_load(File.read(output_path))
-        expect(content['paths']).to have_key('/v2/items')
+        expect(content['paths']).to have_key('/items')
       end
     end
 
@@ -96,7 +96,7 @@ describe Sinatra::ExchangeSchema::RakeTask do
       app = Class.new(Sinatra::Base) do
         register Sinatra::ExchangeSchema
 
-        endpoint :get, '/v2/items' do
+        endpoint :get, '/items' do
           summary 'List items'
         end
 
@@ -105,7 +105,7 @@ describe Sinatra::ExchangeSchema::RakeTask do
           openapi_file 'admin.yaml'
         end
 
-        get('/v2/items') { 'ok' }
+        get('/items') { 'ok' }
         get('/admin/users') { 'ok' }
       end
 
@@ -121,12 +121,12 @@ describe Sinatra::ExchangeSchema::RakeTask do
         expect { Rake::Task['exchange_schema:openapi'].invoke }.to output(/Wrote OpenAPI spec/).to_stdout
 
         default_content = YAML.safe_load(File.read(output_path))
-        expect(default_content['paths']).to have_key('/v2/items')
+        expect(default_content['paths']).to have_key('/items')
         expect(default_content['paths']).not_to have_key('/admin/users')
 
         admin_content = YAML.safe_load(File.read(File.join(dir, 'admin.yaml')))
         expect(admin_content['paths']).to have_key('/admin/users')
-        expect(admin_content['paths']).not_to have_key('/v2/items')
+        expect(admin_content['paths']).not_to have_key('/items')
       end
     end
 
@@ -143,7 +143,7 @@ describe Sinatra::ExchangeSchema::RakeTask do
         expect { Rake::Task['exchange_schema:openapi'].invoke }.to output(/1 endpoints/).to_stdout
 
         content = YAML.safe_load(File.read(output_path))
-        expect(content['paths']).to have_key('/v2/items')
+        expect(content['paths']).to have_key('/items')
       end
     end
 
@@ -185,7 +185,7 @@ describe Sinatra::ExchangeSchema::RakeTask do
       app = Class.new(Sinatra::Base) do
         register Sinatra::ExchangeSchema
 
-        endpoint :get, '/v2/items' do
+        endpoint :get, '/items' do
           summary 'List items'
         end
 
@@ -194,7 +194,7 @@ describe Sinatra::ExchangeSchema::RakeTask do
           openapi_file false
         end
 
-        get('/v2/items') { 'ok' }
+        get('/items') { 'ok' }
         get('/robots.txt') { 'ok' }
       end
 
@@ -205,7 +205,7 @@ describe Sinatra::ExchangeSchema::RakeTask do
         expect { Rake::Task['exchange_schema:openapi'].invoke }.to output(/Wrote OpenAPI spec/).to_stdout
 
         content = YAML.safe_load(File.read(output_path))
-        expect(content['paths']).to have_key('/v2/items')
+        expect(content['paths']).to have_key('/items')
         expect(content['paths']).not_to have_key('/robots.txt')
       end
     end
