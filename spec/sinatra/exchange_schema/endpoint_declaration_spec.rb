@@ -80,6 +80,37 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
       decl = described_class.new(:get, '/test')
       expect { decl.security(:unknown) }.to raise_error(ArgumentError, /Unknown auth: unknown/)
     end
+
+    it 'embeds scopes inside the security array' do
+      decl = described_class.new(:get, '/test')
+      decl.security(:bearer, scopes: ['filters:read'])
+      expect(decl.security).to eq [{ 'bearer' => ['filters:read'] }]
+    end
+
+    it 'embeds multiple scopes' do
+      decl = described_class.new(:get, '/test')
+      decl.security(:bearer, scopes: ['reports:read', 'visitors:read'])
+      expect(decl.security).to eq [{ 'bearer' => ['reports:read', 'visitors:read'] }]
+    end
+
+    it 'defaults to empty scopes when none given' do
+      decl = described_class.new(:get, '/test')
+      decl.security(:bearer)
+      expect(decl.security).to eq [{ 'bearer' => [] }]
+    end
+  end
+
+  describe '#scopes' do
+    it 'returns [] when security is not set' do
+      decl = described_class.new(:get, '/test')
+      expect(decl.scopes).to eq []
+    end
+
+    it 'returns declared scopes' do
+      decl = described_class.new(:get, '/test')
+      decl.security(:bearer, scopes: ['filters:read'])
+      expect(decl.scopes).to eq ['filters:read']
+    end
   end
 
   describe '#openapi_file' do

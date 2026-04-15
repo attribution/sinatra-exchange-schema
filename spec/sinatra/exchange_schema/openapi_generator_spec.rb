@@ -195,5 +195,34 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
       op = doc['paths']['/v2/public']['get']
       expect(op['security']).to eq([])
     end
+
+    it 'emits per-operation security with scopes when declared' do
+      decl = build_declaration(:get, '/v2/filters', summary: 'List') do
+        security :bearer, scopes: ['filters:read']
+      end
+
+      doc = described_class.call([decl])
+      op = doc['paths']['/v2/filters']['get']
+      expect(op['security']).to eq [{ 'bearer' => ['filters:read'] }]
+    end
+
+    it 'omits per-operation security when endpoint has no scopes and matches top-level' do
+      decl = build_declaration(:get, '/v2/filters', summary: 'List') do
+        security :bearer
+      end
+
+      doc = described_class.call([decl])
+      op = doc['paths']['/v2/filters']['get']
+      expect(op).not_to have_key('security')
+    end
+
+    it 'top-level security always has empty scopes regardless of per-endpoint scopes' do
+      decl = build_declaration(:get, '/v2/filters', summary: 'List') do
+        security :bearer, scopes: ['filters:read']
+      end
+
+      doc = described_class.call([decl])
+      expect(doc['security']).to eq [{ 'bearer' => [] }]
+    end
   end
 end

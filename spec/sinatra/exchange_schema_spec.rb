@@ -900,4 +900,48 @@ describe Sinatra::ExchangeSchema do
       end.to raise_error(ArgumentError, /Invalid mode/)
     end
   end
+
+  describe '#current_endpoint_declaration helper' do
+    include Rack::Test::Methods
+
+    let(:captured) { [] }
+
+    let(:app_class) do
+      store = captured
+      Class.new(Sinatra::Base) do
+        register Sinatra::ExchangeSchema
+        set :missing_schema, :off
+
+        endpoint :get, '/scoped' do
+          summary 'Scoped endpoint'
+          security :bearer, scopes: ['filters:read']
+        end
+
+        get '/scoped' do
+          store << current_endpoint_declaration
+          'ok'
+        end
+
+        get '/unregistered' do
+          store << current_endpoint_declaration
+          'ok'
+        end
+      end
+    end
+
+    def app
+      app_class
+    end
+
+    it 'returns the matched EndpointDeclaration' do
+      get '/scoped'
+      expect(captured.first).to be_a Sinatra::ExchangeSchema::EndpointDeclaration
+      expect(captured.first.scopes).to eq ['filters:read']
+    end
+
+    it 'returns nil for unregistered routes' do
+      get '/unregistered'
+      expect(captured.first).to be_nil
+    end
+  end
 end

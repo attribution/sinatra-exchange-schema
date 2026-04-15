@@ -47,7 +47,7 @@ module Sinatra
         @openapi_file = value
       end
 
-      def security(value = :_unset)
+      def security(value = :_unset, scopes: nil)
         return @security if value == :_unset
 
         @security = case value
@@ -55,9 +55,15 @@ module Sinatra
                     when Symbol
                       name = value.to_s
                       AUTH_SCHEMES.fetch(name) { raise ArgumentError, "Unknown auth: #{value}" }
-                      [{ name => [] }]
+                      [{ name => Array(scopes) }]
                     else value
                     end
+      end
+
+      # Returns the OAuth scopes declared for this endpoint (e.g. ['filters:read']).
+      # Extracted from the security array; empty when no scopes are declared.
+      def scopes
+        @security&.flat_map(&:values)&.flatten || []
       end
 
       # Define a JSON Schema for the request body.

@@ -81,7 +81,8 @@ module Sinatra
           operation['responses'] = build_responses(decl.response_schemas)
 
           # Emit per-operation security only when it differs from top-level default
-          if decl.security && decl.security.flat_map(&:keys).to_set != top_level_scheme_names.to_set
+          top_level_security = top_level_scheme_names.map { |n| { n => [] } }
+          if decl.security && decl.security != top_level_security
             operation['security'] = decl.security
           end
 

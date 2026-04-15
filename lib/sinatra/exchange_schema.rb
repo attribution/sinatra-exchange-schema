@@ -171,6 +171,14 @@ module Sinatra
         message = "No endpoint schema declared for #{context[:method]} #{context[:path]}"
         ExchangeSchema.dispatch(mode, :missing_schema, message, context, self)
       end
+
+      app.helpers do
+        # Returns the EndpointDeclaration matched for the current request, or nil.
+        # Use current_endpoint_declaration&.scopes to read declared OAuth scopes.
+        def current_endpoint_declaration
+          env['endpoint_schema.declaration']
+        end
+      end
     end
 
     # Resolve the effective mode for a concern, checking endpoint > controller > app-wide.
