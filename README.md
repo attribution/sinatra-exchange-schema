@@ -61,9 +61,9 @@ post '/articles' do
 end
 ```
 
-### Primitive-Type Responses
+### Array Responses
 
-When an endpoint returns an array of primitives (strings, numbers, tuples) instead of objects, use `response` with the `items:` keyword argument instead of a block. The type describes each **item** in the array — the after-filter automatically unwraps arrays and validates each element individually.
+When an endpoint returns a top-level array, use `response` with the `items:` keyword argument. The generated schema is `{ type: 'array', items: <element schema> }` — OpenAPI and validation both see an array, not a bare element.
 
 ```ruby
 # Array of strings — e.g. ["key1", "key2", "key3"]
@@ -77,9 +77,18 @@ endpoint :get, '/tags/filtered/:key' do
   summary 'Tag values with counts'
   response 200, items: :array
 end
+
+# Array of objects — e.g. [{"id": 1, "name": "First"}, ...]
+endpoint :get, '/articles' do
+  summary 'List articles'
+  response 200, items: :object do
+    integer :id, required: true
+    string  :name, required: true
+  end
+end
 ```
 
-Supported types: `:string`, `:integer`, `:number`, `:boolean`, `:array`.
+Supported element types: `:string`, `:integer`, `:number`, `:boolean`, `:array`, `:object` (with a block).
 
 The same symbol syntax works in the `array` field DSL inside `body`/`query`/`response` blocks — e.g. `array :tags, items: :string`.
 
@@ -119,7 +128,7 @@ Supported schemes: `:bearer` (HTTP Bearer token). Use `:none` to mark an endpoin
 
 ## Schema Builder DSL
 
-The `body`, `query`, and `response` blocks use a builder DSL with these types. (For `response`, you can also pass `items:` directly — see [Primitive-Type Responses](#primitive-type-responses) above.)
+The `body`, `query`, and `response` blocks use a builder DSL with these types. (For `response`, you can also pass `items:` directly — see [Array Responses](#array-responses) above.)
 
 | Method    | Options                                  |
 |-----------|------------------------------------------|

@@ -83,11 +83,27 @@ module Sinatra
       end
 
       # Define a JSON Schema for a response status code.
-      # When +items:+ is given, produces a simple type schema (e.g. { "type" => "string" }).
-      # Otherwise the block is evaluated in the context of a ExchangeSchema::Builder.
+      #
+      # Three modes:
+      #   response 200 do ... end
+      #     => { type: 'object', properties: {...} }
+      #   response 200, items: :string
+      #     => { type: 'array', items: { type: 'string' } }
+      #   response 200, items: :object do ... end
+      #     => { type: 'array', items: { type: 'object', properties: {...} } }
+      #
+      # For +items:+ without a block, the symbol names the element type.
+      # For +items:+ with a block, the block defines the element object schema.
       def response(status_code, items: nil, &block)
         schema = if items
-          { 'type' => items.to_s }
+          item_schema = if block
+            builder = Builder.new
+            builder.instance_eval(&block)
+            builder.to_json_schema
+          else
+            { 'type' => items.to_s }
+          end
+          { 'type' => 'array', 'items' => item_schema }
         else
           builder = Builder.new
           builder.instance_eval(&block) if block

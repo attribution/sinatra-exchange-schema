@@ -142,7 +142,16 @@ module Sinatra
           next if body_str.empty?
 
           payload = ::JSON.parse(body_str)
-          payloads = payload.is_a?(Array) ? payload : [payload]
+          # Array-typed schemas validate the whole payload in one pass (JSONSchemer
+          # checks the array type and each element). Object-typed schemas keep the
+          # legacy unwrap — endpoints that declare an object but return an array
+          # still pass validation element-wise.
+          schema_type = Array(schema['type'])
+          payloads = if schema_type.include?('array')
+            [payload]
+          else
+            payload.is_a?(Array) ? payload : [payload]
+          end
           payloads.each do |item|
             errors = ::Sinatra::ExchangeSchema::ResponseValidator.call(item, schema)
             next unless errors

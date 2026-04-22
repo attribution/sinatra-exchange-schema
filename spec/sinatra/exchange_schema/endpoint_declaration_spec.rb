@@ -38,22 +38,41 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
   end
 
   describe '#response with items: kwarg' do
-    it 'stores a string type schema' do
+    it 'wraps string element type in an array schema' do
       decl = described_class.new(:get, '/test')
       decl.response(200, items: :string)
-      expect(decl.response_schemas[200]).to eq({ 'type' => 'string' })
+      expect(decl.response_schemas[200]).to eq({ 'type' => 'array', 'items' => { 'type' => 'string' } })
     end
 
-    it 'stores an array type schema' do
+    it 'wraps array element type in an array schema' do
       decl = described_class.new(:get, '/test')
       decl.response(200, items: :array)
-      expect(decl.response_schemas[200]).to eq({ 'type' => 'array' })
+      expect(decl.response_schemas[200]).to eq({ 'type' => 'array', 'items' => { 'type' => 'array' } })
     end
 
-    it 'stores an integer type schema' do
+    it 'wraps integer element type in an array schema' do
       decl = described_class.new(:get, '/test')
       decl.response(200, items: :integer)
-      expect(decl.response_schemas[200]).to eq({ 'type' => 'integer' })
+      expect(decl.response_schemas[200]).to eq({ 'type' => 'array', 'items' => { 'type' => 'integer' } })
+    end
+
+    it 'wraps object element schema from block in an array schema' do
+      decl = described_class.new(:get, '/test')
+      decl.response(200, items: :object) do
+        string :id, required: true
+        string :token
+      end
+      expect(decl.response_schemas[200]).to eq({
+        'type' => 'array',
+        'items' => {
+          'type' => 'object',
+          'properties' => {
+            'id'    => { 'type' => 'string' },
+            'token' => { 'type' => 'string' }
+          },
+          'required' => ['id']
+        }
+      })
     end
   end
 

@@ -169,6 +169,44 @@ describe Sinatra::ExchangeSchema do
         [1, 2, 3].to_json
       end
 
+      endpoint :get, '/test_object_array' do
+        summary 'Object array response'
+        response 200, items: :object do
+          string :id, required: true
+          string :token
+        end
+      end
+
+      endpoint :get, '/test_object_array_invalid' do
+        summary 'Invalid object array response'
+        response 200, items: :object do
+          string :id, required: true
+          string :token
+        end
+      end
+
+      endpoint :get, '/test_object_array_not_array' do
+        summary 'Object array endpoint returning an object'
+        response 200, items: :object do
+          string :id, required: true
+        end
+      end
+
+      get '/test_object_array' do
+        content_type :json
+        [{ id: '1', token: 'a' }, { id: '2', token: 'b' }].to_json
+      end
+
+      get '/test_object_array_invalid' do
+        content_type :json
+        [{ id: 1, token: 'a' }].to_json
+      end
+
+      get '/test_object_array_not_array' do
+        content_type :json
+        { id: '1' }.to_json
+      end
+
       get '/no_schema' do
         'ok'
       end
@@ -446,6 +484,37 @@ describe Sinatra::ExchangeSchema do
       it 'raises ResponseSchemaValidationError' do
         expect do
           get '/test_primitive_array_invalid'
+        end.to raise_error(Sinatra::ExchangeSchema::ResponseValidator::ResponseSchemaValidationError)
+      end
+    end
+  end
+
+  describe 'object array response validation' do
+    include Rack::Test::Methods
+
+    def app
+      test_app
+    end
+
+    context 'with valid array of objects' do
+      it 'validates successfully' do
+        get '/test_object_array'
+        expect(last_response.status).to eq(200)
+      end
+    end
+
+    context 'with invalid element in array of objects' do
+      it 'raises ResponseSchemaValidationError' do
+        expect do
+          get '/test_object_array_invalid'
+        end.to raise_error(Sinatra::ExchangeSchema::ResponseValidator::ResponseSchemaValidationError)
+      end
+    end
+
+    context 'when endpoint returns a single object instead of an array' do
+      it 'raises ResponseSchemaValidationError' do
+        expect do
+          get '/test_object_array_not_array'
         end.to raise_error(Sinatra::ExchangeSchema::ResponseValidator::ResponseSchemaValidationError)
       end
     end
