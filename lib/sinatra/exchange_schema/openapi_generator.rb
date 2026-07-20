@@ -1,6 +1,7 @@
-# Generates an OpenAPI 3.0.0 specification hash from EndpointDeclaration objects.
+# Generates an OpenAPI 3.1.0 specification hash from EndpointDeclaration objects.
 # Converts the internal endpoint schema DSL into a standard OpenAPI document
-# that can be serialized to YAML or JSON.
+# that can be serialized to YAML or JSON. 3.1 is required: embedded schemas are
+# raw JSON Schema, invalid under 3.0.
 require 'rack/utils'
 
 module Sinatra
@@ -23,7 +24,7 @@ module Sinatra
         end
 
         doc = {
-          'openapi' => '3.0.0',
+          'openapi' => '3.1.0',
           'info' => {
             'title' => info[:title] || 'API',
             'version' => info[:version] || '1.0.0',

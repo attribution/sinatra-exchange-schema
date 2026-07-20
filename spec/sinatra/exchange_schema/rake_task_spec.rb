@@ -41,7 +41,7 @@ describe Sinatra::ExchangeSchema::RakeTask do
         expect { Rake::Task['exchange_schema:openapi'].invoke }.to output(/Wrote OpenAPI spec/).to_stdout
 
         content = YAML.safe_load(File.read(output_path))
-        expect(content['openapi']).to eq('3.0.0')
+        expect(content['openapi']).to eq('3.1.0')
         expect(content['info']['title']).to eq('Test API')
         expect(content['info']['version']).to eq('2.0')
         expect(content['paths']).to have_key('/items')
