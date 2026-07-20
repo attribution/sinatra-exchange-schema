@@ -1,6 +1,6 @@
 # sinatra-exchange-schema
 
-Sinatra extension that adds an `endpoint` DSL for declaring request/response JSON schemas on routes. Validates payloads at runtime and generates an OpenAPI 3.0 spec from the declarations.
+Sinatra extension that adds an `endpoint` DSL for declaring request/response JSON schemas on routes. Validates payloads at runtime and generates an OpenAPI 3.1 spec from the declarations.
 
 ## Installation
 
@@ -222,7 +222,7 @@ are still reported even when the request is halted.
 
 ## OpenAPI Generation
 
-The gem can generate an OpenAPI 3.0 YAML spec from your endpoint declarations.
+The gem can generate an OpenAPI 3.1 YAML spec from your endpoint declarations.
 
 ### Rake Task
 

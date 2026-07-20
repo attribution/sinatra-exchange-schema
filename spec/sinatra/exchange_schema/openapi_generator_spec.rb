@@ -12,7 +12,7 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
     it 'returns top-level OpenAPI keys' do
       doc = described_class.call([], info: { title: 'Test', version: '1.0', description: 'desc' })
 
-      expect(doc['openapi']).to eq('3.0.0')
+      expect(doc['openapi']).to eq('3.1.0')
       expect(doc['info']['title']).to eq('Test')
       expect(doc['info']['version']).to eq('1.0')
       expect(doc['info']['description']).to eq('desc')

@@ -1,4 +1,4 @@
-# Installs an `exchange_schema:openapi` Rake task that generates an OpenAPI 3.0
+# Installs an `exchange_schema:openapi` Rake task that generates an OpenAPI 3.1
 # YAML spec from endpoint schema declarations. Require this file from
 # your Rakefile (it is NOT auto-required by the gem).
 #
@@ -28,7 +28,7 @@ module Sinatra
       # @param depends_on Prerequisites for the task (default: :environment).
       def self.install(app:, info: {}, output: nil, depends_on: :environment)
         namespace :exchange_schema do
-          desc 'Generate OpenAPI 3.0 YAML from endpoint schema declarations'
+          desc 'Generate OpenAPI 3.1 YAML from endpoint schema declarations'
           task openapi: depends_on do
             require 'sinatra/exchange_schema'
 
