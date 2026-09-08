@@ -1,5 +1,6 @@
-# Installs an `exchange_schema:openapi` Rake task that generates an OpenAPI 3.1
-# YAML spec from endpoint schema declarations. Require this file from
+# Installs the `exchange_schema:openapi` Rake task that generates an OpenAPI 3.1
+# YAML spec from endpoint schema declarations, and `exchange_schema:data_types`
+# that dumps declared data types for review. Require this file from
 # your Rakefile (it is NOT auto-required by the gem).
 #
 # Usage:
@@ -18,7 +19,7 @@ module Sinatra
     class RakeTask
       extend Rake::DSL
 
-      # Defines an `exchange_schema:openapi` Rake task.
+      # Defines the `exchange_schema:openapi` and `exchange_schema:data_types` Rake tasks.
       #
       # @param app [Class, Proc] Sinatra app class or a lambda that returns
       #   one (evaluated at task runtime so :environment can load it first).
@@ -53,6 +54,58 @@ module Sinatra
               puts "Wrote OpenAPI spec to #{file_path} (#{group_decls.size} endpoints)"
             end
           end
+
+          desc 'Dump declared data types beside scopes and response properties (DISTINCT=1 for the token vocabulary)'
+          task data_types: depends_on do
+            require 'sinatra/exchange_schema'
+
+            app_class = app.is_a?(Proc) ? app.call : app
+            declarations = app_class.endpoint_declarations
+            puts ENV['DISTINCT'] ? data_types_vocabulary(declarations) : data_types_table(declarations)
+          end
+        end
+      end
+
+      # One aligned row per declaration: endpoint, scopes, data types and the
+      # top-level properties of its first 2xx response schema.
+      def self.data_types_table(declarations)
+        header = %w[ENDPOINT SCOPES DATA_TYPES RESPONSE]
+        rows = declarations.sort_by { |d| [d.path, d.http_method] }.map do |d|
+          ["#{d.http_method} #{d.path}", d.scopes.join(', '), format_data_types(d.data_types), format_response(d)]
+        end
+        widths = ([header] + rows).transpose.map { |column| column.map(&:length).max }
+        ([header] + rows).map do |row|
+          row.zip(widths).map { |cell, width| cell.ljust(width) }.join(' | ').rstrip
+        end.join("\n")
+      end
+
+      # Distinct data type tokens with the number of declarations using each.
+      def self.data_types_vocabulary(declarations)
+        counts = declarations.flat_map { |d| d.data_types || [] }.tally
+        width = counts.keys.map(&:length).max || 0
+        counts.sort_by { |token, count| [-count, token] }.map do |token, count|
+          "#{token.ljust(width)}  #{count}"
+        end.join("\n")
+      end
+
+      def self.format_data_types(data_types)
+        return '-' if data_types.nil?
+        return 'none' if data_types.empty?
+
+        data_types.join(', ')
+      end
+
+      def self.format_response(declaration)
+        schema = declaration.response_schemas.find { |status, _| status.between?(200, 299) }&.last
+        return '-' unless schema
+
+        if Array(schema['type']).include?('array')
+          items = schema['items'] || {}
+          names = items['properties'] ? items['properties'].keys : [items['type']].compact
+          "[#{names.join(', ')}]"
+        else
+          names = (schema['properties'] || {}).keys
+          names.empty? ? '-' : names.join(', ')
         end
       end
     end

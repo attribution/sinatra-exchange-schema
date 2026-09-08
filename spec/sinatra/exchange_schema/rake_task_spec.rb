@@ -19,6 +19,46 @@ describe Sinatra::ExchangeSchema::RakeTask do
     end
   end
 
+  def build_app_with_data_types
+    Class.new(Sinatra::Base) do
+      register Sinatra::ExchangeSchema
+
+      endpoint :get, '/users/:id' do
+        summary 'Show user'
+        security :bearer, scopes: ['users:read']
+        data_types :email, :postal_address
+        response 200 do
+          integer :id, required: true
+          string :email
+        end
+      end
+
+      endpoint :get, '/health' do
+        summary 'Health check'
+        security :none
+        data_types :none
+      end
+
+      endpoint :get, '/emails' do
+        summary 'List subscriber emails'
+        data_types :email
+        response 200, items: :string
+      end
+
+      endpoint :get, '/items' do
+        summary 'List items'
+        response 200, items: :object do
+          integer :id
+        end
+      end
+
+      get('/users/:id') { 'ok' }
+      get('/health') { 'ok' }
+      get('/emails') { 'ok' }
+      get('/items') { 'ok' }
+    end
+  end
+
   describe '.install' do
     it 'defines an exchange_schema:openapi task' do
       described_class.install(app: build_app_with_endpoints, depends_on: [])
@@ -208,6 +248,35 @@ describe Sinatra::ExchangeSchema::RakeTask do
         expect(content['paths']).to have_key('/items')
         expect(content['paths']).not_to have_key('/robots.txt')
       end
+    end
+
+    it 'defines an exchange_schema:data_types task' do
+      described_class.install(app: build_app_with_endpoints, depends_on: [])
+
+      expect(Rake::Task.task_defined?('exchange_schema:data_types')).to be true
+    end
+
+    it 'dumps endpoints with scopes, data types and response properties side by side' do
+      described_class.install(app: build_app_with_data_types, depends_on: [])
+
+      expect { Rake::Task['exchange_schema:data_types'].invoke }.to output(<<~TABLE).to_stdout
+        ENDPOINT       | SCOPES     | DATA_TYPES            | RESPONSE
+        GET /emails    |            | email                 | [string]
+        GET /health    |            | none                  | -
+        GET /items     |            | -                     | [id]
+        GET /users/:id | users:read | email, postal_address | id, email
+      TABLE
+    end
+
+    it 'dumps the distinct data type vocabulary with DISTINCT=1' do
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with('DISTINCT').and_return('1')
+      described_class.install(app: build_app_with_data_types, depends_on: [])
+
+      expect { Rake::Task['exchange_schema:data_types'].invoke }.to output(<<~VOCABULARY).to_stdout
+        email           2
+        postal_address  1
+      VOCABULARY
     end
 
     it 'defaults to :environment prerequisite' do

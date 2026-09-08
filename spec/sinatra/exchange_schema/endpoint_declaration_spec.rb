@@ -132,6 +132,55 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
     end
   end
 
+  describe '#data_types' do
+    it 'defaults to nil' do
+      decl = described_class.new(:get, '/test')
+      expect(decl.data_types).to be_nil
+    end
+
+    it 'stores symbol tokens as strings' do
+      decl = described_class.new(:get, '/test')
+      decl.data_types(:email, :postal_address)
+      expect(decl.data_types).to eq %w[email postal_address]
+    end
+
+    it 'accepts string tokens and an array' do
+      decl = described_class.new(:get, '/test')
+      decl.data_types(['email', :postal_address])
+      expect(decl.data_types).to eq %w[email postal_address]
+    end
+
+    it 'stores an empty list for :none' do
+      decl = described_class.new(:get, '/test')
+      decl.data_types(:none)
+      expect(decl.data_types).to eq []
+    end
+
+    it 'recognises :none inside an array' do
+      decl = described_class.new(:get, '/test')
+      decl.data_types([:none])
+      expect(decl.data_types).to eq []
+    end
+
+    it 'raises when :none is combined with other tokens' do
+      decl = described_class.new(:get, '/test')
+      expect { decl.data_types(:none, :email) }.to raise_error(ArgumentError, /:none cannot be combined/)
+    end
+
+    it 'drops duplicate tokens' do
+      decl = described_class.new(:get, '/test')
+      decl.data_types(:email, :email)
+      expect(decl.data_types).to eq ['email']
+    end
+
+    it 'raises for tokens that are not snake_case' do
+      decl = described_class.new(:get, '/test')
+      expect { decl.data_types(:postalAddress) }.to raise_error(ArgumentError, /Invalid data type: "postalAddress"/)
+      expect { decl.data_types('postal-address') }.to raise_error(ArgumentError, /Invalid data type/)
+      expect { decl.data_types(:email, :'2nd_email') }.to raise_error(ArgumentError, /Invalid data type/)
+    end
+  end
+
   describe '#openapi_file' do
     it 'defaults to nil' do
       decl = described_class.new(:get, '/test')
