@@ -224,5 +224,31 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
       doc = described_class.call([decl])
       expect(doc['security']).to eq [{ 'bearer' => [] }]
     end
+
+    it 'emits declared data types as x-data-types on the operation' do
+      decl = build_declaration(:get, '/users/:id', summary: 'Show') do
+        data_types :email, :postal_address
+      end
+
+      doc = described_class.call([decl])
+      op = doc['paths']['/users/{id}']['get']
+      expect(op['x-data-types']).to eq %w[email postal_address]
+    end
+
+    it 'emits an empty x-data-types for :none' do
+      decl = build_declaration(:get, '/health', summary: 'Health') do
+        data_types :none
+      end
+
+      doc = described_class.call([decl])
+      expect(doc['paths']['/health']['get']['x-data-types']).to eq []
+    end
+
+    it 'omits x-data-types when data types are not declared' do
+      decl = build_declaration(:get, '/items', summary: 'List')
+
+      doc = described_class.call([decl])
+      expect(doc['paths']['/items']['get']).not_to have_key('x-data-types')
+    end
   end
 end

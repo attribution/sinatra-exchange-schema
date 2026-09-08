@@ -126,6 +126,24 @@ end
 
 Supported schemes: `:bearer` (HTTP Bearer token). Use `:none` to mark an endpoint as public.
 
+### Data Types
+
+`data_types` declares what customer data the endpoint's success payloads can expose, as free-form snake_case tokens (`/\A[a-z][a-z0-9_]*\z/`; anything else raises at declaration time). It is optional and has no runtime effect: absent means the endpoint was not assessed, `:none` means assessed and exposes nothing. Declare the union across query-param variants — if `?include=address` adds the postal address, declare it too.
+
+```ruby
+endpoint :get, '/users/:id' do
+  security :bearer, scopes: ['users:read']
+  data_types :email, :postal_address
+end
+
+endpoint :get, '/health' do
+  security :none
+  data_types :none
+end
+```
+
+The OpenAPI generator emits it as the `x-data-types` extension on the operation (`[]` for `:none`, omitted when not declared). Use `rake exchange_schema:data_types` to review declarations side by side — see [Rake Task](#rake-task).
+
 ## Schema Builder DSL
 
 The `body`, `query`, and `response` blocks use a builder DSL with these types. (For `response`, you can also pass `items:` directly — see [Array Responses](#array-responses) above.)
@@ -252,6 +270,13 @@ Options:
 | `info:`       | `{}`             | OpenAPI info (`title`, `version`, `description`) |
 | `output:`     | `./openapi.yaml` | Output file path (or `ENV['OUTPUT']`) |
 | `depends_on:` | `:environment`   | Rake task prerequisites            |
+
+`install` also defines `exchange_schema:data_types`, a review dump of every declaration: endpoint, scopes, declared data types and the top-level properties of its first 2xx response, one aligned row each (`-` = not assessed, `none` = assessed, exposes nothing). `DISTINCT=1` prints the distinct data type tokens with the number of endpoints declaring each instead.
+
+```bash
+bundle exec rake exchange_schema:data_types
+DISTINCT=1 bundle exec rake exchange_schema:data_types
+```
 
 ### Multi-File Output
 
