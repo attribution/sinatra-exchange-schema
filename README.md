@@ -157,6 +157,46 @@ Each concern accepts one of three modes:
 | `:warn`   | Log a warning **(default)**    |
 | `:strict` | Log a warning **and** raise    |
 
+A fourth setting, `additional_properties`, is a boolean rather than a mode — see below.
+
+### Undeclared Body Keys
+
+JSON Schema allows any key a `body` did not declare, so without this an endpoint answers 200 to
+`descripton` and does nothing with it — the client is never told it misspelled anything.
+
+`additional_properties` is the JSON Schema keyword of the same name, lifted to a setting. It
+defaults to `false`, so an undeclared key is a violation; an app that is not ready for that turns
+it back on:
+
+```ruby
+Sinatra::ExchangeSchema.additional_properties = true   # default: false
+```
+
+This is orthogonal to the modes above: `additional_properties` decides what counts as a
+violation, `request_validation` decides what happens to one. Leaving it closed while
+`request_validation` is `:warn` reports undeclared keys without rejecting them — the way to find
+out what real clients send before turning the screw.
+
+It also keeps the generated OpenAPI honest: an endpoint that reads a key has to declare it.
+
+Two deliberate exceptions:
+
+- **Nested objects stay open.** `object :settings` with no block declares no properties, so
+  closing it would reject every key inside.
+- **Query parameters stay open.** Proxies, analytics and cache-busting add their own.
+
+An endpoint that genuinely accepts arbitrary keys — a third-party webhook whose payload you
+do not control — opts out for itself:
+
+```ruby
+endpoint :post, '/webhook' do
+  additional_properties true
+  body do
+    string :event
+  end
+end
+```
+
 ### Configuration Levels
 
 Settings are resolved with **endpoint > controller > app-wide** precedence.
@@ -164,9 +204,10 @@ Settings are resolved with **endpoint > controller > app-wide** precedence.
 **App-wide** — sets the global default for all controllers:
 
 ```ruby
-Sinatra::ExchangeSchema.request_validation  = :strict
-Sinatra::ExchangeSchema.response_validation = :off
-Sinatra::ExchangeSchema.missing_schema      = :warn
+Sinatra::ExchangeSchema.request_validation    = :strict
+Sinatra::ExchangeSchema.response_validation   = :off
+Sinatra::ExchangeSchema.missing_schema        = :warn
+Sinatra::ExchangeSchema.additional_properties = true
 ```
 
 **Per-controller** — overrides the app-wide default for a single Sinatra class:
@@ -175,6 +216,7 @@ Sinatra::ExchangeSchema.missing_schema      = :warn
 class Api < Sinatra::Base
   register Sinatra::ExchangeSchema
   set :request_validation, :strict
+  set :additional_properties, true
 end
 ```
 
@@ -184,11 +226,18 @@ end
 endpoint :post, '/articles' do
   request_validation :strict
   response_validation :off
+  additional_properties true
   body do
     string :name, required: true
   end
 end
 ```
+
+Leaving a level unset means "inherit"; an explicit value at a lower level wins over the one
+above it, including `additional_properties true` under an app-wide `false`. `missing_schema` has no per-endpoint level — it fires precisely when no
+declaration matched. `additional_properties` is read once, when the endpoint is declared, so
+`set :additional_properties` must appear above the `endpoint` blocks it should affect (the
+same ordering `endpoint_security` already requires).
 
 ### Strict in Tests
 

@@ -42,6 +42,7 @@ module Sinatra
 
     class << self
       attr_reader :request_validation, :response_validation, :missing_schema
+      attr_accessor :additional_properties
 
       def request_validation=(mode)
         validate_mode!(mode)
@@ -71,6 +72,7 @@ module Sinatra
     self.request_validation = :warn
     self.response_validation = :warn
     self.missing_schema = :warn
+    self.additional_properties = false
 
     # Called when a Sinatra app registers this extension.
     def self.registered(app)
@@ -79,6 +81,7 @@ module Sinatra
       app.set :request_validation, nil
       app.set :response_validation, nil
       app.set :missing_schema, nil
+      app.set :additional_properties, nil
       app.set :openapi_file, nil
 
       app.before do
@@ -190,15 +193,17 @@ module Sinatra
       end
     end
 
-    # Resolve the effective mode for a concern, checking endpoint > controller > app-wide.
+    # Resolve the effective value of a setting, checking endpoint > controller > app-wide.
+    # +nil+ at a level means "inherit", so a per-endpoint +false+ still wins over the app default.
+    # +missing_schema+ has no endpoint level: it fires precisely when no declaration matched.
     def self.effective_mode(declaration, concern, controller_settings)
-      if %i[request_validation response_validation].include?(concern)
+      unless concern == :missing_schema
         endpoint_val = declaration&.send(concern)
-        return endpoint_val if endpoint_val
+        return endpoint_val unless endpoint_val.nil?
       end
 
       controller_val = controller_settings.respond_to?(concern) ? controller_settings.send(concern) : nil
-      return controller_val if controller_val
+      return controller_val unless controller_val.nil?
 
       send(concern)
     end
@@ -237,6 +242,7 @@ module Sinatra
       if !decl.openapi_file && settings.respond_to?(:openapi_file) && settings.openapi_file
         decl.openapi_file(settings.openapi_file)
       end
+      decl.close_body! unless ExchangeSchema.effective_mode(decl, :additional_properties, settings)
       endpoint_declarations << decl
     end
   end
