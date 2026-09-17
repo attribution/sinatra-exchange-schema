@@ -37,6 +37,59 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
     end
   end
 
+  describe '#close_body!' do
+    it 'closes the top level' do
+      decl = described_class.new(:post, '/articles')
+      decl.body { string :name, required: true }
+      decl.close_body!
+      expect(decl.body_schema).to eq({
+        'type'                 => 'object',
+        'properties'           => { 'name' => { 'type' => 'string' } },
+        'required'             => ['name'],
+        'additionalProperties' => false
+      })
+    end
+
+    it 'leaves nested objects open' do
+      decl = described_class.new(:post, '/articles')
+      decl.body do
+        object :settings
+        object :meta do
+          string :source
+        end
+      end
+      decl.close_body!
+      expect(decl.body_schema['properties']['settings']).to eq({ 'type' => 'object' })
+      expect(decl.body_schema['properties']['meta']).not_to have_key('additionalProperties')
+    end
+
+    it 'leaves the query schema alone' do
+      decl = described_class.new(:get, '/articles')
+      decl.query { string :status }
+      decl.close_body!
+      expect(decl.query_schema).not_to have_key('additionalProperties')
+    end
+
+    it 'does nothing when no body is declared' do
+      decl = described_class.new(:get, '/articles')
+      expect { decl.close_body! }.not_to raise_error
+      expect(decl.body_schema).to be_nil
+    end
+  end
+
+  describe '#additional_properties' do
+    it 'defaults to nil so the controller or app decides' do
+      decl = described_class.new(:post, '/articles')
+      expect(decl.additional_properties).to be_nil
+    end
+
+    it 'stores an explicit opt-out' do
+      decl = described_class.new(:post, '/articles')
+      decl.additional_properties true
+      expect(decl.additional_properties).to be true
+    end
+  end
+
   describe '#response with items: kwarg' do
     it 'wraps string element type in an array schema' do
       decl = described_class.new(:get, '/test')

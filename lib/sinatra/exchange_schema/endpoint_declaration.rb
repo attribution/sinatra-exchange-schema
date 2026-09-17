@@ -43,6 +43,12 @@ module Sinatra
         @response_validation = value
       end
 
+      def additional_properties(value = :_unset)
+        return @additional_properties if value == :_unset
+
+        @additional_properties = value
+      end
+
       def openapi_file(value = :_unset)
         return @openapi_file if value == :_unset
 
@@ -90,6 +96,17 @@ module Sinatra
         builder = Builder.new
         builder.instance_eval(&block)
         @body_schema = builder.to_json_schema
+      end
+
+      # Rejects body keys this endpoint never declared. Called by the +endpoint+ DSL once the
+      # block has run, so it applies whether +body+ came before or after +additional_properties+.
+      #
+      # Only the top level closes. Nested objects stay open: +object :settings+ with no block
+      # declares no properties at all, so closing it would reject every key inside.
+      def close_body!
+        return if @body_schema.nil?
+
+        @body_schema = @body_schema.merge('additionalProperties' => false)
       end
 
       # Define a JSON Schema for query-string parameters.

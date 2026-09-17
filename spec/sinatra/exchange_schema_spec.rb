@@ -1013,4 +1013,108 @@ describe Sinatra::ExchangeSchema do
       expect(captured.first).to be_nil
     end
   end
+
+  describe 'undeclared body keys' do
+    include Rack::Test::Methods
+
+    def app
+      app_class
+    end
+
+    def post_undeclared(path)
+      post path, { name: 'test', nmae: 'typo' }.to_json, 'CONTENT_TYPE' => 'application/json'
+    end
+
+    context 'by default' do
+      let(:app_class) do
+        Class.new(Sinatra::Base) do
+          register Sinatra::ExchangeSchema
+
+          endpoint :post, '/closed' do
+            body { string :name, required: true }
+          end
+
+          endpoint :post, '/opted_out' do
+            additional_properties true
+            body { string :name, required: true }
+          end
+
+          endpoint :get, '/closed' do
+            query { string :status }
+          end
+
+          post('/closed')    { 'ok' }
+          post('/opted_out') { 'ok' }
+          get('/closed')     { 'ok' }
+        end
+      end
+
+      it 'rejects an undeclared body key' do
+        expect { post_undeclared '/closed' }.
+          to raise_error(Sinatra::ExchangeSchema::RequestValidator::SchemaValidationError,
+                         /disallowed additional property/i)
+      end
+
+      it 'still accepts a declared body' do
+        post '/closed', { name: 'test' }.to_json, 'CONTENT_TYPE' => 'application/json'
+        expect(last_response.status).to eq(200)
+      end
+
+      it 'lets a single endpoint opt out' do
+        post_undeclared '/opted_out'
+        expect(last_response.status).to eq(200)
+      end
+
+      it 'leaves query parameters open' do
+        get '/closed', status: 'active', cache_buster: '1'
+        expect(last_response.status).to eq(200)
+      end
+    end
+
+    context 'when a controller opts out' do
+      let(:app_class) do
+        Class.new(Sinatra::Base) do
+          register Sinatra::ExchangeSchema
+          set :additional_properties, true
+
+          endpoint :post, '/inherits_controller' do
+            body { string :name, required: true }
+          end
+
+          post('/inherits_controller') { 'ok' }
+        end
+      end
+
+      it 'honours the controller over the app default' do
+        post_undeclared '/inherits_controller'
+        expect(last_response.status).to eq(200)
+      end
+    end
+
+    context 'when the app opts out' do
+      let(:app_class) do
+        Class.new(Sinatra::Base) do
+          register Sinatra::ExchangeSchema
+
+          endpoint :post, '/inherits_app' do
+            body { string :name, required: true }
+          end
+
+          post('/inherits_app') { 'ok' }
+        end
+      end
+
+      around do |example|
+        Sinatra::ExchangeSchema.additional_properties = true
+        example.run
+      ensure
+        Sinatra::ExchangeSchema.additional_properties = false
+      end
+
+      it 'accepts an undeclared key' do
+        post_undeclared '/inherits_app'
+        expect(last_response.status).to eq(200)
+      end
+    end
+  end
 end
