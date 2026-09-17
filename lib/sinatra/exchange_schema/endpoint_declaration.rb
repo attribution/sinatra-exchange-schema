@@ -14,6 +14,8 @@ module Sinatra
         'basic'  => { 'type' => 'http', 'scheme' => 'basic' }
       }.freeze
 
+      DATA_TYPE_FORMAT = /\A[a-z][a-z0-9_]*\z/
+
       attr_reader :http_method, :path,
                   :body_schema, :query_schema, :response_schemas
 
@@ -64,6 +66,22 @@ module Sinatra
       # Extracted from the security array; empty when no scopes are declared.
       def scopes
         @security&.flat_map(&:values)&.flatten || []
+      end
+
+      # Declare what customer data the success payloads can expose, as free-form
+      # snake_case tokens. Absent means not assessed; +:none+ means assessed and
+      # exposes nothing. Metadata only — emitted to OpenAPI as x-data-types.
+      def data_types(*values)
+        return @data_types if values.empty?
+
+        tokens = values.flatten.map(&:to_s)
+        tokens = [] if tokens == ['none']
+        raise ArgumentError, ':none cannot be combined with other data types' if tokens.include?('none')
+
+        invalid = tokens.grep_v(DATA_TYPE_FORMAT)
+        raise ArgumentError, "Invalid data type: #{invalid.first.inspect} (expected snake_case)" if invalid.any?
+
+        @data_types = tokens.uniq
       end
 
       # Define a JSON Schema for the request body.

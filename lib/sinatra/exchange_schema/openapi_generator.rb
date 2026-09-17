@@ -87,6 +87,9 @@ module Sinatra
             operation['security'] = decl.security
           end
 
+          # Specification extension: https://spec.openapis.org/oas/v3.1.0#specification-extensions
+          operation['x-data-types'] = decl.data_types if decl.data_types
+
           operation
         end
 
