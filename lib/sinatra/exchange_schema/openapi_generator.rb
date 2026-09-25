@@ -50,13 +50,14 @@ module Sinatra
           sinatra_path.gsub(/:(\w+)/, '{\1}')
         end
 
-        def extract_path_params(sinatra_path)
-          sinatra_path.scan(/:(\w+)/).flatten.map do |name|
+        def extract_path_params(decl)
+          declared = decl.path_schema ? decl.path_schema['properties'] : {}
+          decl.path_params.map do |name|
             param = {
               'name' => name,
               'in' => 'path',
               'required' => true,
-              'schema' => { 'type' => name.end_with?('_id') ? 'integer' : 'string' }
+              'schema' => declared[name] || { 'type' => name.end_with?('_id') ? 'integer' : 'string' }
             }
             param
           end
@@ -66,7 +67,7 @@ module Sinatra
           operation = {}
           operation['summary'] = decl.summary if decl.summary
 
-          parameters = extract_path_params(decl.path)
+          parameters = extract_path_params(decl)
           parameters += build_query_params(decl.query_schema) if decl.query_schema
 
           operation['parameters'] = parameters unless parameters.empty?

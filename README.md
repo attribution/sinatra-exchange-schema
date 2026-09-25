@@ -30,7 +30,7 @@ end
 
 ## Declaring Endpoints
 
-Place `endpoint` blocks above your route handlers. The block accepts `summary`, `body`, `query`, `response`, and `security` directives.
+Place `endpoint` blocks above your route handlers. The block accepts `summary`, `body`, `query`, `path`, `response`, and `security` directives.
 
 ```ruby
 endpoint :post, '/articles' do
@@ -113,6 +113,29 @@ endpoint :get, '/articles' do
 end
 ```
 
+### Path Parameters
+
+A path parameter gets its OpenAPI type from its name: one ending in `_id` is documented as an
+`integer`, any other as a `string`. When the name misleads — a UUID, a slug or another service's
+id behind an `_id` placeholder — a `path` block declares the type:
+
+```ruby
+endpoint :get, '/articles/:article_id/uploads/:upload_id' do
+  summary 'Get an upload'
+
+  path do
+    string :upload_id, description: 'UUID of the upload'
+  end
+end
+```
+
+A parameter the block leaves out keeps the name-based type, so `article_id` above stays an
+`integer`. Every path parameter is `required: true` whatever the block says, because OpenAPI
+requires it. Naming a parameter the route does not have raises when the endpoint is declared.
+
+The block shapes the generated contract only: Sinatra hands path parameters over as strings, and
+runtime validation covers the body and the query.
+
 ### Security
 
 A default security scheme can be set at the app level with `set :endpoint_security, :bearer`. Individual endpoints can override it:
@@ -146,7 +169,7 @@ The OpenAPI generator emits it as the `x-data-types` extension on the operation 
 
 ## Schema Builder DSL
 
-The `body`, `query`, and `response` blocks use a builder DSL with these types. (For `response`, you can also pass `items:` directly — see [Array Responses](#array-responses) above.)
+The `body`, `query`, `path`, and `response` blocks use a builder DSL with these types. (For `response`, you can also pass `items:` directly — see [Array Responses](#array-responses) above.)
 
 | Method    | Options                                  |
 |-----------|------------------------------------------|

@@ -37,6 +37,13 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
     end
   end
 
+  describe '#path' do
+    it 'raises for a parameter the route does not have' do
+      decl = described_class.new(:get, '/uploads/:upload_id')
+      expect { decl.path { string :upload_uid } }.to raise_error(ArgumentError, /Unknown path parameter: upload_uid/)
+    end
+  end
+
   describe '#close_body!' do
     it 'closes the top level' do
       decl = described_class.new(:post, '/articles')
