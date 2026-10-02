@@ -1,5 +1,5 @@
 # Holds metadata for a single endpoint: HTTP method, path, summary,
-# and optional body/query/response JSON Schemas built via ExchangeSchema::Builder.
+# and optional body/query/path/response JSON Schemas built via ExchangeSchema::Builder.
 #
 # Instances are created by the +endpoint+ DSL in Sinatra::ExchangeSchema
 # and stored on the controller class. The before-filter validates requests
@@ -16,8 +16,8 @@ module Sinatra
 
       DATA_TYPE_FORMAT = /\A[a-z][a-z0-9_]*\z/
 
-      attr_reader :http_method, :path,
-                  :body_schema, :query_schema, :response_schemas
+      attr_reader :http_method,
+                  :body_schema, :query_schema, :path_schema, :response_schemas
 
       def initialize(http_method, path)
         @http_method = http_method.to_s.upcase
@@ -117,6 +117,18 @@ module Sinatra
         @query_schema = builder.to_json_schema
       end
 
+      # Define a JSON Schema for path parameters. Without a block, returns the route path.
+      def path(&block)
+        return @path unless block
+
+        builder = Builder.new
+        builder.instance_eval(&block)
+        unknown = builder.properties.keys - path_params
+        raise ArgumentError, "Unknown path parameter: #{unknown.join(', ')} (not in #{path})" if unknown.any?
+
+        @path_schema = builder.to_json_schema
+      end
+
       # Define a JSON Schema for a response status code.
       #
       # Three modes:
@@ -145,6 +157,10 @@ module Sinatra
           builder.to_json_schema
         end
         @response_schemas[status_code.to_i] = schema
+      end
+
+      def path_params
+        path.scan(/:(\w+)/).flatten
       end
 
       # Convert Sinatra-style path to a regex for matching requests.

@@ -121,7 +121,7 @@ module Sinatra
 
         if declaration.query_schema
           query_hash = params.reject { |k, _| k.start_with?('splat', 'captures') }
-          declaration.path.scan(/:(\w+)/).flatten.each { |p| query_hash.delete(p) }
+          declaration.path_params.each { |p| query_hash.delete(p) }
           errors = ::Sinatra::ExchangeSchema::RequestValidator.call(query_hash, declaration.query_schema)
           if errors
             context = { method: request.request_method, path: request.path_info, errors: errors }
@@ -231,7 +231,7 @@ module Sinatra
     end
 
     # Declare an endpoint schema. Place directly above the corresponding
-    # route handler. Accepts an optional block with +body+, +query+,
+    # route handler. Accepts an optional block with +body+, +query+, +path+,
     # and/or +response+ sub-blocks that use the Builder DSL.
     def endpoint(http_method, path, &block)
       decl = ::Sinatra::ExchangeSchema::EndpointDeclaration.new(http_method, path)

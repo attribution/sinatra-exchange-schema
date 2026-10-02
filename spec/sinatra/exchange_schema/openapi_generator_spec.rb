@@ -81,6 +81,24 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
       expect(slug_param['schema']['type']).to eq('string')
     end
 
+    it 'takes declared path params from the path block and infers the rest by name' do
+      decl = build_declaration(:get, '/articles/:article_id/uploads/:upload_id', summary: 'Get upload') do
+        path do
+          string :upload_id, description: 'UUID of the upload'
+        end
+      end
+
+      doc = described_class.call([decl])
+      op = doc['paths']['/articles/{article_id}/uploads/{upload_id}']['get']
+
+      upload_param = op['parameters'].find { |p| p['name'] == 'upload_id' }
+      expect(upload_param['required']).to be true
+      expect(upload_param['schema']).to eq('type' => 'string', 'description' => 'UUID of the upload')
+
+      article_param = op['parameters'].find { |p| p['name'] == 'article_id' }
+      expect(article_param['schema']).to eq('type' => 'integer')
+    end
+
     it 'maps response schemas with status codes' do
       decl = build_declaration(:post, '/items', summary: 'Create') do
         response 200 do
