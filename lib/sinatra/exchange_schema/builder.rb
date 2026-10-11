@@ -10,6 +10,7 @@
 #   builder.instance_eval do
 #     string  :name, required: true
 #     string  :status, enum: %w[active archived]
+#     string  :since, format: :date
 #     integer :page
 #     object  :metadata do
 #       string :source
@@ -43,6 +44,7 @@ module Sinatra
           types += ['null'] if opts[:nullable] || existing_types.include?('null')
           prop = (@properties[name] || {}).merge('type' => types.one? ? types.first : types)
           prop['enum'] = opts[:enum] if opts[:enum]
+          prop['format'] = opts[:format].to_s if opts[:format]
           prop['description'] = opts[:description] if opts[:description]
           @properties[name] = prop
           @required_fields << name if opts[:required] && !@required_fields.include?(name)

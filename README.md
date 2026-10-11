@@ -173,12 +173,16 @@ The `body`, `query`, `path`, and `response` blocks use a builder DSL with these 
 
 | Method    | Options                                  |
 |-----------|------------------------------------------|
-| `string`  | `required:`, `enum:`, `nullable:`, `description:` |
-| `integer` | `required:`, `enum:`, `nullable:`, `description:` |
-| `number`  | `required:`, `enum:`, `nullable:`, `description:` |
+| `string`  | `required:`, `enum:`, `format:`, `nullable:`, `description:` |
+| `integer` | `required:`, `enum:`, `format:`, `nullable:`, `description:` |
+| `number`  | `required:`, `enum:`, `format:`, `nullable:`, `description:` |
 | `boolean` | `required:`, `nullable:`, `description:`           |
 | `array`   | `required:`, `nullable:`, `items:`, `description:`, block |
 | `object`  | `required:`, `nullable:`, `description:`, block (optional) |
+
+`format:` takes a JSON Schema format name (`date`, `date-time`, `email`, `uri`, …). json_schemer validates it under the
+gem's default options, so `string :start_date, format: :date` rejects `2026-13-01` at request time, and the OpenAPI
+generator emits it on the property.
 
 ## Runtime Validation
 
