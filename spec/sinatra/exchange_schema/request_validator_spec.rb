@@ -18,6 +18,21 @@ describe Sinatra::ExchangeSchema::RequestValidator do
       end
     end
 
+    context 'with a format on a property' do
+      let(:schema) do
+        { 'type' => 'object', 'properties' => { 'since' => { 'type' => 'string', 'format' => 'date' } } }
+      end
+
+      it 'accepts a value in that format' do
+        expect(described_class.call({ 'since' => '2026-10-11' }, schema)).to be_nil
+      end
+
+      it 'rejects a value outside it, naming the field' do
+        result = described_class.call({ 'since' => '2026-13-01' }, schema)
+        expect(result.first).to include(field: '/since', type: 'format')
+      end
+    end
+
     context 'with nil schema' do
       it 'returns nil' do
         result = described_class.call({ 'bad' => true }, nil)

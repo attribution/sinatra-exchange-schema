@@ -41,6 +41,14 @@ describe Sinatra::ExchangeSchema::Builder do
     end
   end
 
+  describe 'format' do
+    before { builder.string :since, format: :date }
+
+    it 'includes the format name' do
+      expect(schema['properties']['since']).to eq('type' => 'string', 'format' => 'date')
+    end
+  end
+
   describe 'no required fields' do
     before { builder.string :name }
 
