@@ -80,7 +80,7 @@ module Sinatra
             }
           end
 
-          operation['responses'] = build_responses(decl.response_schemas)
+          operation['responses'] = build_responses(decl)
 
           # Emit per-operation security only when it differs from top-level default
           top_level_security = top_level_scheme_names.map { |n| { n => [] } }
@@ -109,15 +109,15 @@ module Sinatra
           end
         end
 
-        def build_responses(response_schemas)
-          return { '200' => { 'description' => 'OK' } } if response_schemas.empty?
+        def build_responses(decl)
+          return { '200' => { 'description' => 'OK' } } if decl.response_schemas.empty?
 
-          response_schemas.each_with_object({}) do |(status_code, schema), responses|
+          decl.response_schemas.each_with_object({}) do |(status_code, schema), responses|
             key = status_code.to_s
             description = Rack::Utils::HTTP_STATUS_CODES[status_code] || 'Response'
             entry = { 'description' => description }
             entry['content'] = {
-              'application/json' => { 'schema' => schema }
+              decl.response_content_type(status_code) => { 'schema' => schema }
             }
             responses[key] = entry
           end

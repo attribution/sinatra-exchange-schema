@@ -120,6 +120,21 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
       expect(responses['400']['description']).to eq('Bad Request')
     end
 
+    it 'emits a non-JSON response under its media type' do
+      decl = build_declaration(:get, '/articles.csv', summary: 'Articles as CSV') do
+        response 200, content: 'text/csv'
+        response 404 do
+          string :error, required: true
+        end
+      end
+
+      doc = described_class.call([decl])
+      responses = doc['paths']['/articles.csv']['get']['responses']
+
+      expect(responses['200']['content']).to eq('text/csv' => { 'schema' => { 'type' => 'string' } })
+      expect(responses['404']['content']).to have_key('application/json')
+    end
+
     it 'returns default 200 response for endpoints without response schemas' do
       decl = build_declaration(:get, '/ping', summary: 'Ping')
 

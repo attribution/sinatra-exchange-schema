@@ -136,6 +136,29 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
     end
   end
 
+  describe '#response with content: kwarg' do
+    it 'declares a non-JSON body as a string under its media type' do
+      decl = described_class.new(:get, '/articles.csv')
+      decl.response(200, content: 'text/csv')
+      expect(decl.response_schemas[200]).to eq({ 'type' => 'string' })
+      expect(decl.response_content_type(200)).to eq('text/csv')
+      expect(decl.json_response?(200)).to be false
+    end
+
+    it 'treats a response without content as JSON' do
+      decl = described_class.new(:get, '/articles')
+      decl.response(200) { string :id }
+      expect(decl.response_content_type(200)).to eq('application/json')
+      expect(decl.json_response?(200)).to be true
+    end
+
+    it 'refuses a schema with a non-JSON content type' do
+      decl = described_class.new(:get, '/articles.csv')
+      expect { decl.response(200, content: 'text/csv') { string :id } }.to raise_error(ArgumentError, /takes no schema/)
+      expect { decl.response(200, content: 'text/csv', items: :string) }.to raise_error(ArgumentError, /takes no schema/)
+    end
+  end
+
   describe '#security' do
     it 'sets bearer security' do
       decl = described_class.new(:get, '/test')

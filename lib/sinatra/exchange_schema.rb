@@ -139,6 +139,7 @@ module Sinatra
 
         schema = declaration.response_schemas[response.status]
         next unless schema
+        next unless declaration.json_response?(response.status)
 
         begin
           body_str = response.body.is_a?(Array) ? response.body.join : response.body.to_s
