@@ -134,6 +134,35 @@ describe Sinatra::ExchangeSchema do
         "[1,2]\n"
       end
 
+      endpoint :get, '/test_two_forms' do
+        summary 'Returns CSV, or JSON when it cannot'
+        response 200, content: 'text/csv'
+        response 200, content: 'application/problem+json'
+        response 200 do
+          string :error, required: true
+        end
+      end
+
+      get '/test_two_forms' do
+        case params['form']
+        when 'csv'
+          content_type 'text/csv'
+          "a,b\n"
+        when 'json'
+          content_type :json
+          { error: 'no file' }.to_json
+        when 'problem'
+          content_type 'application/problem+json'
+          { unexpected: true }.to_json
+        when 'upper'
+          content_type 'Application/JSON; charset=utf-8'
+          { unexpected: true }.to_json
+        else
+          content_type :json
+          { unexpected: true }.to_json
+        end
+      end
+
       endpoint :post, '/test_array_response' do
         summary 'Array response'
         body do
@@ -453,6 +482,33 @@ describe Sinatra::ExchangeSchema do
         get '/test_csv_response'
         expect(last_response.status).to eq(200)
         expect(last_response.body).to eq("[1,2]\n")
+      end
+    end
+
+    context 'with a status declared in several forms' do
+      it 'leaves the non-JSON form alone' do
+        get '/test_two_forms', form: 'csv'
+        expect(last_response.body).to eq("a,b\n")
+      end
+
+      it 'validates the JSON form against its schema' do
+        get '/test_two_forms', form: 'json'
+        expect(last_response.status).to eq(200)
+      end
+
+      it 'raises on a JSON body that misses the form' do
+        expect { get '/test_two_forms' }.
+          to raise_error(Sinatra::ExchangeSchema::ResponseValidator::ResponseSchemaValidationError, /error/)
+      end
+
+      it 'reads the media type case-insensitively' do
+        expect { get '/test_two_forms', form: 'upper' }.
+          to raise_error(Sinatra::ExchangeSchema::ResponseValidator::ResponseSchemaValidationError, /error/)
+      end
+
+      it 'leaves another JSON-based media type to its own form' do
+        get '/test_two_forms', form: 'problem'
+        expect(last_response.status).to eq(200)
       end
     end
   end

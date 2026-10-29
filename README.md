@@ -157,7 +157,8 @@ Two shorthands cover the edges. `response 200` with no block declares an object 
 and the body is checked to be an object, nothing more. An endpoint with no `response` at all is documented as a
 bare `200 OK` with no content, and its body is never validated.
 
-Declaring the same status twice keeps the last declaration, media type included.
+A status holds one form per media type, so declaring the same JSON status twice keeps the last declaration.
+A second form under another media type is added beside it — see [Non-JSON Responses](#non-json-responses).
 
 #### Array Responses
 
@@ -224,6 +225,20 @@ parse as JSON. A schema block or `items:` with such a content type raises, since
 endpoint :get, '/articles.csv' do
   summary 'Articles as CSV'
   response 200, content: 'text/csv'
+end
+```
+
+A status may take several forms, one per media type — a CSV file, or a JSON body when no file could be made. Each
+`response` adds or replaces the form of its media type; the spec lists them all under the status, and the filter
+validates a JSON body against the JSON form and leaves the others alone, going by the `Content-Type` the route sends.
+
+```ruby
+endpoint :get, '/articles.csv' do
+  summary 'Articles as CSV, or why there is no file'
+  response 200, content: 'text/csv'
+  response 200 do
+    string :error, required: true, description: 'Why no file came back'
+  end
 end
 ```
 
@@ -353,8 +368,9 @@ A fourth setting, `additional_properties`, is a boolean rather than a mode — s
 - **Request body** — every method but `GET`, against the `body` schema. A body that is not valid JSON is skipped;
   a body that cannot be rewound is skipped with a warning.
 - **Query** — against the `query` schema, as strings, with path parameters removed and undeclared keys allowed.
-- **Response body** — only a status the endpoint declared, and only when that status is JSON; a `500`, or a `422` the
-  endpoint never declared, passes unchecked. An empty body passes.
+- **Response body** — only a status the endpoint declared, against its JSON form; a `500`, or a `422` the endpoint
+  never declared, passes unchecked. A status with no JSON form is never validated; one with several forms is
+  validated only when the `Content-Type` sent is `application/json`. An empty body passes.
 - **Missing schema** — a routed request with no matching declaration. `OPTIONS` and `HEAD` are exempt.
 
 An array payload against an object-typed schema — a request body that is a JSON array, or a response that returns an

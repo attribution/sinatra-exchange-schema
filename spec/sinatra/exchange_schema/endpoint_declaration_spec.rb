@@ -184,16 +184,33 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
       expect(decl.json_response?(200)).to be true
     end
 
-    it 'lets a later JSON declaration of the status replace a non-JSON one' do
-      decl = described_class.new(:get, '/articles')
+    it 'keeps several forms of one status, the JSON one first' do
+      decl = described_class.new(:get, '/articles.csv')
       decl.response(200, content: 'text/csv')
-      decl.response(200) { string :id }
-      expect(decl.response_content_type(200)).to eq('application/json')
-      expect(decl.response_schemas[200]['properties']).to have_key('id')
+      decl.response(200) { string :error }
 
-      decl.response(200, content: 'text/csv')
-      decl.response(200, content: 'application/json') { string :name }
+      expect(decl.response_forms(200).keys).to eq(%w[application/json text/csv])
+      expect(decl.json_schema(200)['properties']).to have_key('error')
       expect(decl.json_response?(200)).to be true
+      expect(decl.response_content_type(200)).to eq('application/json')
+      expect(decl.response_schemas[200]).to eq(decl.json_schema(200))
+    end
+
+    it 'replaces the form of a media type declared again' do
+      decl = described_class.new(:get, '/articles')
+      decl.response(200) { string :id }
+      decl.response(200, content: 'application/json') { string :name }
+      expect(decl.json_schema(200)['properties'].keys).to eq(['name'])
+      expect(decl.response_forms(200).size).to eq(1)
+    end
+
+    it 'lists every declared status with its forms' do
+      decl = described_class.new(:get, '/articles.csv')
+      decl.response(404) { string :error }
+      decl.response(200, content: 'text/csv')
+      expect(decl.response_forms.keys).to eq([200, 404])
+      expect(decl.response_schemas.keys).to eq([200, 404])
+      expect(decl.json_schema(200)).to be_nil
     end
 
     it 'refuses a schema with a non-JSON content type' do
