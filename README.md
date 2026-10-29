@@ -299,6 +299,8 @@ it back on:
 Sinatra::ExchangeSchema.additional_properties = true   # default: false
 ```
 
+A body that declares `values` has said what its other keys take, and keeps that whatever the setting.
+
 This is orthogonal to the modes above: `additional_properties` decides what counts as a
 violation, `request_validation` decides what happens to one. Leaving it closed while
 `request_validation` is `:warn` reports undeclared keys without rejecting them — the way to find
