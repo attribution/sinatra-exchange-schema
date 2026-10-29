@@ -19,13 +19,13 @@ module Sinatra
       DATA_TYPE_FORMAT = /\A[a-z][a-z0-9_]*\z/
 
       attr_reader :http_method,
-                  :body_schema, :query_schema, :path_schema, :response_schemas
+                  :body_schema, :query_schema, :path_schema
 
       def initialize(http_method, path)
         @http_method = http_method.to_s.upcase
         @path = path
-        @response_schemas = {}
-        @response_content_types = {}
+        @json_schemas = {}  # status => the JSON form's schema
+        @other_forms = {}   # status => { media type => schema } for the forms that are not JSON
       end
 
       def summary(value = :_unset)
@@ -154,17 +154,19 @@ module Sinatra
       # A body that is not JSON (a CSV file, plain text) is declared by its media type alone:
       #   response 200, content: 'text/csv'
       #     => { type: 'string' }, emitted under that media type and never validated
+      #
+      # A status may take several forms, one per media type: a CSV file and, when there is none, a
+      # JSON body. Each declaration adds or replaces the form of its media type; the filter validates
+      # a JSON body against the JSON form and leaves the others alone.
       def response(status_code, items: nil, values: nil, content: nil, &block)
         if content && content != JSON_CONTENT_TYPE
           raise ArgumentError, "a #{content} response takes no schema" if items || values || block
 
-          @response_content_types[status_code.to_i] = content
-          return @response_schemas[status_code.to_i] = { 'type' => 'string' }
+          @other_forms[status_code.to_i] ||= {}
+          return @other_forms[status_code.to_i][content] = { 'type' => 'string' }
         end
         raise ArgumentError, 'a response is an array (items:) or a map (values:), not both' if items && values
 
-        # the last declaration of a status wins, its media type included
-        @response_content_types.delete(status_code.to_i)
         schema = if items
           { 'type' => 'array', 'items' => element_schema(items, &block) }
         elsif values
@@ -174,7 +176,7 @@ module Sinatra
           builder.instance_eval(&block) if block
           builder.to_json_schema
         end
-        @response_schemas[status_code.to_i] = schema
+        @json_schemas[status_code.to_i] = schema
       end
 
       # The schema of an array's elements or a map's values: a block builds an object, a symbol
@@ -192,14 +194,40 @@ module Sinatra
       end
       private :element_schema
 
-      # The media type a declared response is sent as; JSON unless declared otherwise.
-      def response_content_type(status_code)
-        @response_content_types.fetch(status_code.to_i, JSON_CONTENT_TYPE)
+      # Every declared status, in order, each with its forms: the JSON schema first when there is
+      # one, then the others by media type.
+      def response_forms(status_code = nil)
+        return response_forms_of(status_code.to_i) if status_code
+
+        (@json_schemas.keys | @other_forms.keys).sort.to_h { |status| [status, response_forms_of(status)] }
+      end
+
+      # One schema per declared status: the JSON form's, or the single other form's where a status
+      # has no JSON form.
+      def response_schemas
+        response_forms.transform_values { |forms| forms.values.first }
+      end
+
+      # The schema a JSON body of this status is validated against; nil when the status has no JSON form.
+      def json_schema(status_code)
+        @json_schemas[status_code.to_i]
       end
 
       def json_response?(status_code)
-        response_content_type(status_code) == JSON_CONTENT_TYPE
+        @json_schemas.key?(status_code.to_i)
       end
+
+      # The media type the status's first form is sent as; JSON unless only others are declared.
+      def response_content_type(status_code)
+        response_forms_of(status_code.to_i).keys.first || JSON_CONTENT_TYPE
+      end
+
+      def response_forms_of(status)
+        forms = {}
+        forms[JSON_CONTENT_TYPE] = @json_schemas[status] if @json_schemas.key?(status)
+        forms.merge(@other_forms.fetch(status, {}))
+      end
+      private :response_forms_of
 
       def path_params
         path.scan(/:(\w+)/).flatten
