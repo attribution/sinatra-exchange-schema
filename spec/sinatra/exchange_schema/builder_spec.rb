@@ -241,4 +241,49 @@ describe Sinatra::ExchangeSchema::Builder do
       expect { builder.map :totals }.to raise_error(ArgumentError, /needs values: or a block/)
     end
   end
+
+  describe 'values' do
+    it 'declares what every key not named takes, beside the named ones' do
+      builder.object :total do
+        integer :views
+      end
+      builder.values do
+        integer :views
+        integer :change
+      end
+
+      expect(schema['properties'].keys).to eq(['total'])
+      expect(schema['additionalProperties']['properties'].keys).to eq(%w[views change])
+    end
+
+    it 'takes a type' do
+      builder.values :integer
+      expect(schema['additionalProperties']).to eq('type' => 'integer')
+    end
+
+    it 'takes a schema hash' do
+      builder.values('type' => 'array', 'items' => { 'type' => 'string' })
+      expect(schema['additionalProperties']).to eq('type' => 'array', 'items' => { 'type' => 'string' })
+    end
+
+    it 'works inside a map\'s value object' do
+      builder.map :by_article do
+        object(:total) { integer :views }
+        values { integer :views }
+      end
+
+      value = schema['properties']['by_article']['additionalProperties']
+      expect(value['properties'].keys).to eq(['total'])
+      expect(value['additionalProperties']['properties'].keys).to eq(['views'])
+    end
+
+    it 'refuses values without a type, a schema or a block' do
+      expect { builder.values }.to raise_error(ArgumentError, /needs a type/)
+    end
+
+    it 'is left out when never declared' do
+      builder.string :name
+      expect(schema).not_to have_key('additionalProperties')
+    end
+  end
 end

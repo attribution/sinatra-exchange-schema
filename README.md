@@ -231,6 +231,7 @@ The `body`, `query`, `path`, and `response` blocks use a builder DSL with these 
 | `array`   | `required:`, `nullable:`, `items:`, `description:`, block |
 | `object`  | `required:`, `nullable:`, `description:`, block (optional) |
 | `map`     | `required:`, `nullable:`, `values:`, `description:`, block |
+| `values`  | a type, a schema hash, or a block: what every key not named in the block takes |
 
 `format:` takes a JSON Schema format name (`date`, `date-time`, `email`, `uri`, …). json_schemer validates it under the
 gem's default options, so `string :start_date, format: :date` rejects `2026-13-01` at request time, and the OpenAPI
@@ -246,6 +247,21 @@ response 200 do
   map :articles, description: 'Keyed by article id' do
     string  :name, required: true
     integer :views
+  end
+end
+```
+
+An object with some named keys and any number of others takes `values` inside its block: the named keys keep their own
+schemas, every other key takes the one `values` declares. A map's value object can carry it too.
+
+```ruby
+map :by_article, description: 'Keyed by article id' do
+  object :total, description: 'All periods added up' do
+    integer :views
+  end
+  values do # any other key is a period id
+    integer :views
+    integer :change, description: 'Views against the period before'
   end
 end
 ```
