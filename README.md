@@ -333,6 +333,18 @@ response 200 do
 end
 ```
 
+A response body that validates against it:
+
+```json
+{
+  "totals": { "draft": 3, "published": 9 },
+  "articles": {
+    "17": { "name": "First", "views": 120 },
+    "42": { "name": "Second" }
+  }
+}
+```
+
 A property that takes more than one scalar type is declared once per type under the same name; the types merge into a
 union:
 
