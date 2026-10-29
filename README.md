@@ -88,9 +88,33 @@ endpoint :get, '/articles' do
 end
 ```
 
-Supported element types: `:string`, `:integer`, `:number`, `:boolean`, `:array`, `:object` (with a block).
+Supported element types: `:string`, `:integer`, `:number`, `:boolean`, `:array`, `:object` (with a block), or a schema hash.
 
 The same symbol syntax works in the `array` field DSL inside `body`/`query`/`response` blocks — e.g. `array :tags, items: :string`.
+
+### Map Responses
+
+When the top-level body is an object keyed by data — ids, names — use `response` with `values:`, the way `items:` declares
+an array. The generated schema is `{ type: 'object', additionalProperties: <value schema> }`, so the validator checks
+every value whatever its key.
+
+```ruby
+# Keyed by id, a result per key — e.g. {"17": true, "42": "not found"}
+endpoint :delete, '/articles' do
+  summary 'Delete articles'
+  response 200, values: { 'type' => %w[boolean string] }
+end
+
+# Keyed by name, an object per key — e.g. {"draft": {"count": 3}, "published": {"count": 9}}
+endpoint :get, '/articles/by_status' do
+  summary 'Articles per status'
+  response 200, values: :object do
+    integer :count, required: true
+  end
+end
+```
+
+Inside a block, `map` declares the same shape as a property — see [Schema Builder DSL](#schema-builder-dsl).
 
 ### Non-JSON Responses
 

@@ -145,28 +145,30 @@ module Sinatra
       # For +items:+ without a block, the symbol names the element type.
       # For +items:+ with a block, the block defines the element object schema.
       #
+      # A map, an object keyed by data, takes +values:+ the same way:
+      #   response 200, values: :boolean
+      #     => { type: 'object', additionalProperties: { type: 'boolean' } }
+      #   response 200, values: :object do ... end
+      #     => { type: 'object', additionalProperties: { type: 'object', properties: {...} } }
+      #
       # A body that is not JSON (a CSV file, plain text) is declared by its media type alone:
       #   response 200, content: 'text/csv'
       #     => { type: 'string' }, emitted under that media type and never validated
-      def response(status_code, items: nil, content: nil, &block)
+      def response(status_code, items: nil, values: nil, content: nil, &block)
         if content && content != JSON_CONTENT_TYPE
-          raise ArgumentError, "a #{content} response takes no schema" if items || block
+          raise ArgumentError, "a #{content} response takes no schema" if items || values || block
 
           @response_content_types[status_code.to_i] = content
           return @response_schemas[status_code.to_i] = { 'type' => 'string' }
         end
+        raise ArgumentError, 'a response is an array (items:) or a map (values:), not both' if items && values
 
         # the last declaration of a status wins, its media type included
         @response_content_types.delete(status_code.to_i)
         schema = if items
-          item_schema = if block
-            builder = Builder.new
-            builder.instance_eval(&block)
-            builder.to_json_schema
-          else
-            { 'type' => items.to_s }
-          end
-          { 'type' => 'array', 'items' => item_schema }
+          { 'type' => 'array', 'items' => element_schema(items, &block) }
+        elsif values
+          { 'type' => 'object', 'additionalProperties' => element_schema(values, &block) }
         else
           builder = Builder.new
           builder.instance_eval(&block) if block
@@ -174,6 +176,21 @@ module Sinatra
         end
         @response_schemas[status_code.to_i] = schema
       end
+
+      # The schema of an array's elements or a map's values: a block builds an object, a symbol
+      # names a type, a hash is taken as it is.
+      def element_schema(type, &block)
+        if block
+          builder = Builder.new
+          builder.instance_eval(&block)
+          builder.to_json_schema
+        elsif type.is_a?(Symbol)
+          { 'type' => type.to_s }
+        else
+          type
+        end
+      end
+      private :element_schema
 
       # The media type a declared response is sent as; JSON unless declared otherwise.
       def response_content_type(status_code)
