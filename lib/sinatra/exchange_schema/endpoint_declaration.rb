@@ -156,6 +156,8 @@ module Sinatra
           return @response_schemas[status_code.to_i] = { 'type' => 'string' }
         end
 
+        # the last declaration of a status wins, its media type included
+        @response_content_types.delete(status_code.to_i)
         schema = if items
           item_schema = if block
             builder = Builder.new
