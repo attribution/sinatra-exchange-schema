@@ -2,7 +2,8 @@
 # Used by EndpointDeclaration to define request body and query schemas inline.
 #
 # Scalar types: string, integer, number, boolean
-# Compound types: array (with +items+ block, symbol, or hash), object (with nested block)
+# Compound types: array (with +items+ block, symbol, or hash), object (with nested block),
+# map (an object keyed by data, with +values+ symbol or hash, or a nested block)
 #
 # == Usage
 #
@@ -18,6 +19,7 @@
 #     array :tags do
 #       string :value
 #     end
+#     map :totals, values: :integer
 #   end
 #   builder.to_json_schema
 #   # => { "type" => "object",
@@ -79,6 +81,26 @@ module Sinatra
           prop['description'] = description if description
           @properties[name] = prop
         end
+        @required_fields << name if required
+      end
+
+      # An object whose keys are data (ids, dates, names) and whose values share one schema: a
+      # +values+ symbol names a scalar type, a +values+ hash is used as the schema, a block builds
+      # the value object. Emitted as +additionalProperties+, so the validator checks every value.
+      def map(name, values: nil, required: false, nullable: false, description: nil, &block)
+        name = name.to_s
+        prop = { 'type' => nullable ? %w[object null] : 'object' }
+        prop['additionalProperties'] = if block
+          nested = self.class.new
+          nested.instance_eval(&block)
+          nested.to_json_schema
+        elsif values
+          values.is_a?(Symbol) ? { 'type' => values.to_s } : values
+        else
+          raise ArgumentError, "map #{name.inspect} needs values: or a block"
+        end
+        prop['description'] = description if description
+        @properties[name] = prop
         @required_fields << name if required
       end
 

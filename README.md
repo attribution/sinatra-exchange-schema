@@ -179,10 +179,25 @@ The `body`, `query`, `path`, and `response` blocks use a builder DSL with these 
 | `boolean` | `required:`, `nullable:`, `description:`           |
 | `array`   | `required:`, `nullable:`, `items:`, `description:`, block |
 | `object`  | `required:`, `nullable:`, `description:`, block (optional) |
+| `map`     | `required:`, `nullable:`, `values:`, `description:`, block |
 
 `format:` takes a JSON Schema format name (`date`, `date-time`, `email`, `uri`, …). json_schemer validates it under the
 gem's default options, so `string :start_date, format: :date` rejects `2026-13-01` at request time, and the OpenAPI
 generator emits it on the property.
+
+`map` declares an object whose keys are data — ids, dates, names — and whose values share one schema, emitted as
+`additionalProperties` so the validator checks every value and the spec documents the map. `values:` takes a scalar
+type symbol or any schema hash (an array, another map); a block builds the value object.
+
+```ruby
+response 200 do
+  map :totals, values: :integer, description: 'Count per status'
+  map :articles, description: 'Keyed by article id' do
+    string  :name, required: true
+    integer :views
+  end
+end
+```
 
 ## Runtime Validation
 

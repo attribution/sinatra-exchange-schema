@@ -194,4 +194,51 @@ describe Sinatra::ExchangeSchema::Builder do
       expect(schema['properties']['metadata']).to eq('type' => %w[object null])
     end
   end
+
+  describe 'map' do
+    it 'compiles scalar values from a symbol' do
+      builder.map :totals, values: :integer
+      expect(schema['properties']['totals']).to eq('type' => 'object', 'additionalProperties' => { 'type' => 'integer' })
+    end
+
+    it 'takes a schema hash as the values' do
+      builder.map :tags, values: { 'type' => 'array', 'items' => { 'type' => 'string' } }
+      expect(schema['properties']['tags']['additionalProperties']).to eq('type' => 'array', 'items' => { 'type' => 'string' })
+    end
+
+    it 'compiles the value object from a block' do
+      builder.map :articles, required: true, description: 'Keyed by article id' do
+        string  :name, required: true
+        integer :views
+      end
+
+      articles = schema['properties']['articles']
+      expect(articles['type']).to eq('object')
+      expect(articles['description']).to eq('Keyed by article id')
+      expect(articles['additionalProperties']).to eq(
+        'type' => 'object',
+        'properties' => { 'name' => { 'type' => 'string' }, 'views' => { 'type' => 'integer' } },
+        'required' => ['name']
+      )
+      expect(schema['required']).to eq(['articles'])
+    end
+
+    it 'nests under an object and as another map\'s values' do
+      builder.object :report do
+        map :by_day, values: { 'type' => 'object', 'additionalProperties' => { 'type' => 'number' } }
+      end
+
+      by_day = schema['properties']['report']['properties']['by_day']
+      expect(by_day['additionalProperties']['additionalProperties']).to eq('type' => 'number')
+    end
+
+    it 'produces a type array when nullable' do
+      builder.map :totals, values: :integer, nullable: true
+      expect(schema['properties']['totals']['type']).to eq(%w[object null])
+    end
+
+    it 'refuses a map without values' do
+      expect { builder.map :totals }.to raise_error(ArgumentError, /needs values: or a block/)
+    end
+  end
 end
