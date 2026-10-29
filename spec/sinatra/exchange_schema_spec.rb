@@ -137,6 +137,7 @@ describe Sinatra::ExchangeSchema do
       endpoint :get, '/test_two_forms' do
         summary 'Returns CSV, or JSON when it cannot'
         response 200, content: 'text/csv'
+        response 200, content: 'application/problem+json'
         response 200 do
           string :error, required: true
         end
@@ -150,6 +151,12 @@ describe Sinatra::ExchangeSchema do
         when 'json'
           content_type :json
           { error: 'no file' }.to_json
+        when 'problem'
+          content_type 'application/problem+json'
+          { unexpected: true }.to_json
+        when 'upper'
+          content_type 'Application/JSON; charset=utf-8'
+          { unexpected: true }.to_json
         else
           content_type :json
           { unexpected: true }.to_json
@@ -492,6 +499,16 @@ describe Sinatra::ExchangeSchema do
       it 'raises on a JSON body that misses the form' do
         expect { get '/test_two_forms' }.
           to raise_error(Sinatra::ExchangeSchema::ResponseValidator::ResponseSchemaValidationError, /error/)
+      end
+
+      it 'reads the media type case-insensitively' do
+        expect { get '/test_two_forms', form: 'upper' }.
+          to raise_error(Sinatra::ExchangeSchema::ResponseValidator::ResponseSchemaValidationError, /error/)
+      end
+
+      it 'leaves another JSON-based media type to its own form' do
+        get '/test_two_forms', form: 'problem'
+        expect(last_response.status).to eq(200)
       end
     end
   end

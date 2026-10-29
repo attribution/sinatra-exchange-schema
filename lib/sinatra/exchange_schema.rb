@@ -139,10 +139,11 @@ module Sinatra
 
         schema = declaration.json_schema(response.status)
         next unless schema
-        # a status with several forms is validated only when the body sent is the JSON one
+        # a status with several forms is validated only when the body sent is the JSON one; media
+        # types compare case-insensitively, and another JSON-based type is its own form
         if declaration.response_forms(response.status).size > 1
-          media_type = response.content_type.to_s.split(';').first.to_s.strip
-          next unless media_type == EndpointDeclaration::JSON_CONTENT_TYPE || media_type.end_with?('+json')
+          media_type = response.content_type.to_s.split(';').first.to_s.strip.downcase
+          next unless media_type == EndpointDeclaration::JSON_CONTENT_TYPE
         end
 
         begin
