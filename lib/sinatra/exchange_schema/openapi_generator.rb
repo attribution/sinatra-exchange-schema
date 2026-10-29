@@ -110,15 +110,14 @@ module Sinatra
         end
 
         def build_responses(decl)
-          return { '200' => { 'description' => 'OK' } } if decl.response_schemas.empty?
+          forms = decl.response_forms
+          return { '200' => { 'description' => 'OK' } } if forms.empty?
 
-          decl.response_schemas.each_with_object({}) do |(status_code, schema), responses|
+          forms.each_with_object({}) do |(status_code, by_media_type), responses|
             key = status_code.to_s
             description = Rack::Utils::HTTP_STATUS_CODES[status_code] || 'Response'
             entry = { 'description' => description }
-            entry['content'] = {
-              decl.response_content_type(status_code) => { 'schema' => schema }
-            }
+            entry['content'] = by_media_type.transform_values { |schema| { 'schema' => schema } }
             responses[key] = entry
           end
         end

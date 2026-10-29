@@ -135,6 +135,21 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
       expect(responses['404']['content']).to have_key('application/json')
     end
 
+    it 'emits every form of a status under its media type' do
+      decl = build_declaration(:get, '/articles.csv', summary: 'Articles as CSV, or why not') do
+        response 200, content: 'text/csv'
+        response 200 do
+          string :error, required: true
+        end
+      end
+
+      content = described_class.call([decl])['paths']['/articles.csv']['get']['responses']['200']['content']
+
+      expect(content.keys).to eq(%w[application/json text/csv])
+      expect(content['application/json']['schema']['properties']).to have_key('error')
+      expect(content['text/csv']).to eq('schema' => { 'type' => 'string' })
+    end
+
     it 'emits a map response with its values schema' do
       decl = build_declaration(:delete, '/articles', summary: 'Delete articles') do
         response 200, values: { 'type' => %w[boolean string] }

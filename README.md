@@ -129,6 +129,20 @@ endpoint :get, '/articles.csv' do
 end
 ```
 
+A status may take several forms, one per media type — a CSV file, or a JSON body when no file could be made. Each
+`response` adds or replaces the form of its media type; the spec lists them all under the status, and the filter
+validates a JSON body against the JSON form and leaves the others alone, going by the `Content-Type` the route sends.
+
+```ruby
+endpoint :get, '/articles.csv' do
+  summary 'Articles as CSV, or why there is no file'
+  response 200, content: 'text/csv'
+  response 200 do
+    string :error, required: true, description: 'Why no file came back'
+  end
+end
+```
+
 ### Query Parameters
 
 ```ruby

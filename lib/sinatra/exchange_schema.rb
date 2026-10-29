@@ -137,9 +137,13 @@ module Sinatra
         next unless declaration
         next if declaration.response_schemas.empty?
 
-        schema = declaration.response_schemas[response.status]
+        schema = declaration.json_schema(response.status)
         next unless schema
-        next unless declaration.json_response?(response.status)
+        # a status with several forms is validated only when the body sent is the JSON one
+        if declaration.response_forms(response.status).size > 1
+          media_type = response.content_type.to_s.split(';').first.to_s.strip
+          next unless media_type == EndpointDeclaration::JSON_CONTENT_TYPE || media_type.end_with?('+json')
+        end
 
         begin
           body_str = response.body.is_a?(Array) ? response.body.join : response.body.to_s
