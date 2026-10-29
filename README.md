@@ -92,6 +92,19 @@ Supported element types: `:string`, `:integer`, `:number`, `:boolean`, `:array`,
 
 The same symbol syntax works in the `array` field DSL inside `body`/`query`/`response` blocks — e.g. `array :tags, items: :string`.
 
+### Non-JSON Responses
+
+A body that is not JSON — a CSV file, plain text — is declared by its media type alone. The generated spec publishes the
+success under that media type with a string schema, and the response filter leaves the body alone, even when it happens to
+parse as JSON. A schema block or `items:` with such a content type raises, since there is nothing to build.
+
+```ruby
+endpoint :get, '/articles.csv' do
+  summary 'Articles as CSV'
+  response 200, content: 'text/csv'
+end
+```
+
 ### Query Parameters
 
 ```ruby

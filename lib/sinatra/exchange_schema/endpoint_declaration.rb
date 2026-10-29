@@ -9,6 +9,8 @@ require_relative 'builder'
 module Sinatra
   module ExchangeSchema
     class EndpointDeclaration
+      JSON_CONTENT_TYPE = 'application/json'.freeze
+
       AUTH_SCHEMES = {
         'bearer' => { 'type' => 'http', 'scheme' => 'bearer' },
         'basic'  => { 'type' => 'http', 'scheme' => 'basic' }
@@ -23,6 +25,7 @@ module Sinatra
         @http_method = http_method.to_s.upcase
         @path = path
         @response_schemas = {}
+        @response_content_types = {}
       end
 
       def summary(value = :_unset)
@@ -141,7 +144,20 @@ module Sinatra
       #
       # For +items:+ without a block, the symbol names the element type.
       # For +items:+ with a block, the block defines the element object schema.
-      def response(status_code, items: nil, &block)
+      #
+      # A body that is not JSON (a CSV file, plain text) is declared by its media type alone:
+      #   response 200, content: 'text/csv'
+      #     => { type: 'string' }, emitted under that media type and never validated
+      def response(status_code, items: nil, content: nil, &block)
+        if content && content != JSON_CONTENT_TYPE
+          raise ArgumentError, "a #{content} response takes no schema" if items || block
+
+          @response_content_types[status_code.to_i] = content
+          return @response_schemas[status_code.to_i] = { 'type' => 'string' }
+        end
+
+        # the last declaration of a status wins, its media type included
+        @response_content_types.delete(status_code.to_i)
         schema = if items
           item_schema = if block
             builder = Builder.new
@@ -157,6 +173,15 @@ module Sinatra
           builder.to_json_schema
         end
         @response_schemas[status_code.to_i] = schema
+      end
+
+      # The media type a declared response is sent as; JSON unless declared otherwise.
+      def response_content_type(status_code)
+        @response_content_types.fetch(status_code.to_i, JSON_CONTENT_TYPE)
+      end
+
+      def json_response?(status_code)
+        response_content_type(status_code) == JSON_CONTENT_TYPE
       end
 
       def path_params

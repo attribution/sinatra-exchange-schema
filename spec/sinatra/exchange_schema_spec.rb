@@ -103,6 +103,17 @@ describe Sinatra::ExchangeSchema do
         'plain text response'
       end
 
+      endpoint :get, '/test_csv_response' do
+        summary 'Returns CSV'
+        response 200, content: 'text/csv'
+      end
+
+      get '/test_csv_response' do
+        content_type 'text/csv'
+        # a body that parses as JSON, so only the declared media type keeps it out of validation
+        "[1,2]\n"
+      end
+
       endpoint :post, '/test_array_response' do
         summary 'Array response'
         body do
@@ -402,6 +413,14 @@ describe Sinatra::ExchangeSchema do
       it 'skips gracefully' do
         post '/test_plain_response', { name: 'hello' }.to_json, 'CONTENT_TYPE' => 'application/json'
         expect(last_response.status).to eq(200)
+      end
+    end
+
+    context 'with a response declared under another media type' do
+      it 'skips validation even when the body parses as JSON' do
+        get '/test_csv_response'
+        expect(last_response.status).to eq(200)
+        expect(last_response.body).to eq("[1,2]\n")
       end
     end
   end
