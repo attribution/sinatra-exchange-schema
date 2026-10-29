@@ -35,5 +35,22 @@ describe Sinatra::ExchangeSchema::ResponseValidator do
         expect(result.first).to include(:field, :error, :type, :actual_value)
       end
     end
+
+    context 'with a map' do
+      let(:schema) do
+        builder = Sinatra::ExchangeSchema::Builder.new
+        builder.map(:articles) { integer :views, required: true }
+        builder.to_json_schema
+      end
+
+      it 'passes a payload with any keys whose values fit' do
+        expect(described_class.call({ 'articles' => { '17' => { 'views' => 3 }, '42' => { 'views' => 9 } } }, schema)).to be_nil
+      end
+
+      it 'fails the one wrong value, naming its key' do
+        result = described_class.call({ 'articles' => { '17' => { 'views' => 3 }, '42' => { 'views' => 'nine' } } }, schema)
+        expect(result.map { |err| err[:field] }).to eq(['/articles/42/views'])
+      end
+    end
   end
 end
