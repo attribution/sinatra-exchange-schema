@@ -135,6 +135,17 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
       expect(responses['404']['content']).to have_key('application/json')
     end
 
+    it 'emits a map response with its values schema' do
+      decl = build_declaration(:delete, '/articles', summary: 'Delete articles') do
+        response 200, values: { 'type' => %w[boolean string] }
+      end
+
+      doc = described_class.call([decl])
+      schema = doc['paths']['/articles']['delete']['responses']['200']['content']['application/json']['schema']
+
+      expect(schema).to eq('type' => 'object', 'additionalProperties' => { 'type' => %w[boolean string] })
+    end
+
     it 'returns default 200 response for endpoints without response schemas' do
       decl = build_declaration(:get, '/ping', summary: 'Ping')
 

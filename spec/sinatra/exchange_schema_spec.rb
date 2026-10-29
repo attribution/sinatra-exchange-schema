@@ -103,6 +103,26 @@ describe Sinatra::ExchangeSchema do
         'plain text response'
       end
 
+      endpoint :delete, '/test_map_response' do
+        summary 'Returns a map'
+        response 200, values: { 'type' => %w[boolean string] }
+      end
+
+      delete '/test_map_response' do
+        content_type :json
+        { '17' => true, '42' => 'not found' }.to_json
+      end
+
+      endpoint :delete, '/test_map_response/fail' do
+        summary 'Returns a map with a wrong value'
+        response 200, values: { 'type' => %w[boolean string] }
+      end
+
+      delete '/test_map_response/fail' do
+        content_type :json
+        { '17' => true, '42' => 1 }.to_json
+      end
+
       endpoint :get, '/test_csv_response' do
         summary 'Returns CSV'
         response 200, content: 'text/csv'
@@ -413,6 +433,18 @@ describe Sinatra::ExchangeSchema do
       it 'skips gracefully' do
         post '/test_plain_response', { name: 'hello' }.to_json, 'CONTENT_TYPE' => 'application/json'
         expect(last_response.status).to eq(200)
+      end
+    end
+
+    context 'with a map response' do
+      it 'passes values of the declared type under any key' do
+        delete '/test_map_response'
+        expect(last_response.status).to eq(200)
+      end
+
+      it 'raises on a value of another type' do
+        expect { delete '/test_map_response/fail' }.
+          to raise_error(Sinatra::ExchangeSchema::ResponseValidator::ResponseSchemaValidationError, %r{/42})
       end
     end
 

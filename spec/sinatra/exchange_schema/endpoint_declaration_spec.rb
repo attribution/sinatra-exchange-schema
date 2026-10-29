@@ -136,6 +136,38 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
     end
   end
 
+  describe '#response with values: kwarg' do
+    it 'declares a map of a scalar type' do
+      decl = described_class.new(:delete, '/articles')
+      decl.response(200, values: :boolean)
+      expect(decl.response_schemas[200]).to eq({ 'type' => 'object', 'additionalProperties' => { 'type' => 'boolean' } })
+    end
+
+    it 'takes a schema hash as the values' do
+      decl = described_class.new(:delete, '/articles')
+      decl.response(200, values: { 'type' => %w[boolean string] })
+      expect(decl.response_schemas[200]['additionalProperties']).to eq({ 'type' => %w[boolean string] })
+    end
+
+    it 'builds the value object from a block' do
+      decl = described_class.new(:get, '/articles/by_status')
+      decl.response(200, values: :object) do
+        integer :count, required: true
+      end
+      expect(decl.response_schemas[200]).to eq({
+        'type' => 'object',
+        'additionalProperties' => {
+          'type' => 'object', 'properties' => { 'count' => { 'type' => 'integer' } }, 'required' => ['count']
+        }
+      })
+    end
+
+    it 'refuses items and values together' do
+      decl = described_class.new(:get, '/articles')
+      expect { decl.response(200, items: :string, values: :string) }.to raise_error(ArgumentError, /not both/)
+    end
+  end
+
   describe '#response with content: kwarg' do
     it 'declares a non-JSON body as a string under its media type' do
       decl = described_class.new(:get, '/articles.csv')
@@ -168,6 +200,7 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
       decl = described_class.new(:get, '/articles.csv')
       expect { decl.response(200, content: 'text/csv') { string :id } }.to raise_error(ArgumentError, /takes no schema/)
       expect { decl.response(200, content: 'text/csv', items: :string) }.to raise_error(ArgumentError, /takes no schema/)
+      expect { decl.response(200, content: 'text/csv', values: :string) }.to raise_error(ArgumentError, /takes no schema/)
     end
   end
 
