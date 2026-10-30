@@ -232,6 +232,7 @@ The `body`, `query`, `path`, and `response` blocks use a builder DSL with these 
 | `object`  | `required:`, `nullable:`, `description:`, block (optional) |
 | `map`     | `required:`, `nullable:`, `values:`, `description:`, block |
 | `values`  | a type, a schema hash, or a block: what every key not named in the block takes |
+| `any`     | `required:`, `description:` — any JSON value, as the full type list |
 
 `format:` takes a JSON Schema format name (`date`, `date-time`, `email`, `uri`, …). json_schemer validates it under the
 gem's default options, so `string :start_date, format: :date` rejects `2026-13-01` at request time, and the OpenAPI
@@ -240,6 +241,10 @@ generator emits it on the property.
 `map` declares an object whose keys are data — ids, dates, names — and whose values share one schema, emitted as
 `additionalProperties` so the validator checks every value and the spec documents the map. `values:` takes a scalar
 type symbol or any schema hash (an array, another map); a block builds the value object.
+
+`any` declares a field that takes any JSON value — a free-form attribute stored as the client sent it — as the full
+type list, `string`, `integer`, `number`, `boolean`, `object`, `array` and `null`, so the validator accepts whatever
+arrives and the generated spec shows a declared type rather than an open schema.
 
 ```ruby
 response 200 do

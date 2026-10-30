@@ -195,6 +195,21 @@ describe Sinatra::ExchangeSchema::Builder do
     end
   end
 
+  describe 'any' do
+    it 'declares every JSON type' do
+      builder.any :trait, description: 'As the client sent it'
+      expect(builder.to_json_schema['properties']['trait']).to eq(
+        'type' => %w[string integer number boolean object array null],
+        'description' => 'As the client sent it'
+      )
+    end
+
+    it 'tracks required' do
+      builder.any :trait, required: true
+      expect(builder.to_json_schema['required']).to eq ['trait']
+    end
+  end
+
   describe 'map' do
     it 'compiles scalar values from a symbol' do
       builder.map :totals, values: :integer
