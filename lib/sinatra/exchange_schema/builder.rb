@@ -4,6 +4,7 @@
 # Scalar types: string, integer, number, boolean
 # Compound types: array (with +items+ block, symbol, or hash), object (with nested block),
 # map (an object keyed by data, with +values+ symbol or hash, or a nested block)
+# Inside any block, +values+ declares what every key not named there takes.
 #
 # == Usage
 #
@@ -36,6 +37,7 @@ module Sinatra
       def initialize
         @properties = {}
         @required_fields = []
+        @values = nil
       end
 
       TYPES.each do |type|
@@ -104,12 +106,28 @@ module Sinatra
         @required_fields << name if required
       end
 
+      # What every key not named in this block takes: a symbol names a scalar type, a hash is used as
+      # the schema, a block builds the value object. Emitted as +additionalProperties+ beside the
+      # named properties, for an object with some fixed keys and any number of others.
+      def values(type = nil, &block)
+        @values = if block
+          nested = self.class.new
+          nested.instance_eval(&block)
+          nested.to_json_schema
+        elsif type
+          type.is_a?(Symbol) ? { 'type' => type.to_s } : type
+        else
+          raise ArgumentError, 'values needs a type, a schema or a block'
+        end
+      end
+
       def to_json_schema
         schema = {
           'type' => 'object',
           'properties' => @properties
         }
         schema['required'] = @required_fields unless @required_fields.empty?
+        schema['additionalProperties'] = @values if @values
         schema
       end
     end

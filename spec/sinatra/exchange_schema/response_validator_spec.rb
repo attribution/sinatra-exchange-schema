@@ -52,5 +52,37 @@ describe Sinatra::ExchangeSchema::ResponseValidator do
         expect(result.map { |err| err[:field] }).to eq(['/articles/42/views'])
       end
     end
+
+    context 'with named keys beside values' do
+      let(:schema) do
+        builder = Sinatra::ExchangeSchema::Builder.new
+        builder.map(:by_article) do
+          object(:total, required: true) { integer :views, required: true }
+          values do
+            integer :views, required: true
+            integer :change, required: true
+          end
+        end
+        builder.to_json_schema
+      end
+
+      let(:payload) do
+        { 'by_article' => { '7' => { 'total' => { 'views' => 12 }, 'p1' => { 'views' => 5, 'change' => 0 }, 'p2' => { 'views' => 7, 'change' => 2 } } } }
+      end
+
+      it 'passes the named key under its own schema and the others under values' do
+        expect(described_class.call(payload, schema)).to be_nil
+      end
+
+      it 'fails a period that misses what values require, naming it' do
+        payload['by_article']['7']['p2'] = { 'views' => 7 }
+        expect(described_class.call(payload, schema).map { |err| err[:field] }).to eq(['/by_article/7/p2'])
+      end
+
+      it 'fails the named key under its own schema, not the values one' do
+        payload['by_article']['7']['total'] = { 'views' => 'twelve' }
+        expect(described_class.call(payload, schema).map { |err| err[:field] }).to eq(['/by_article/7/total/views'])
+      end
+    end
   end
 end

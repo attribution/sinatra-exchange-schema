@@ -105,9 +105,10 @@ module Sinatra
       # block has run, so it applies whether +body+ came before or after +additional_properties+.
       #
       # Only the top level closes. Nested objects stay open: +object :settings+ with no block
-      # declares no properties at all, so closing it would reject every key inside.
+      # declares no properties at all, so closing it would reject every key inside. A body that
+      # declared +values+ said what its other keys take, and keeps that.
       def close_body!
-        return if @body_schema.nil?
+        return if @body_schema.nil? || @body_schema.key?('additionalProperties')
 
         @body_schema = @body_schema.merge('additionalProperties' => false)
       end
