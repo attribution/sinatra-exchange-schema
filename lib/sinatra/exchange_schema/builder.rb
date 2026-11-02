@@ -53,7 +53,7 @@ module Sinatra
           prop['format'] = opts[:format].to_s if opts[:format]
           prop['description'] = opts[:description] if opts[:description]
           @properties[name] = prop
-          @required_fields << name if opts[:required] && !@required_fields.include?(name)
+          require_field(name) if opts[:required]
         end
       end
 
@@ -64,7 +64,7 @@ module Sinatra
         prop = { 'type' => JSON_TYPES.dup }
         prop['description'] = description if description
         @properties[name] = prop
-        @required_fields << name if required
+        require_field(name) if required
       end
 
       def array(name, items: nil, required: false, nullable: false, description: nil, &block)
@@ -79,7 +79,7 @@ module Sinatra
         end
         prop['description'] = description if description
         @properties[name] = prop
-        @required_fields << name if required
+        require_field(name) if required
       end
 
       def object(name, required: false, nullable: false, description: nil, &block)
@@ -95,7 +95,7 @@ module Sinatra
           prop['description'] = description if description
           @properties[name] = prop
         end
-        @required_fields << name if required
+        require_field(name) if required
       end
 
       # An object whose keys are data (ids, dates, names) and whose values share one schema: a
@@ -115,7 +115,7 @@ module Sinatra
         end
         prop['description'] = description if description
         @properties[name] = prop
-        @required_fields << name if required
+        require_field(name) if required
       end
 
       # What every key not named in this block takes: a symbol names a scalar type, a hash is used as
@@ -141,6 +141,13 @@ module Sinatra
         schema['required'] = @required_fields unless @required_fields.empty?
         schema['additionalProperties'] = @values if @values
         schema
+      end
+
+      private
+
+      # A field is required once, however many times it is declared.
+      def require_field(name)
+        @required_fields << name unless @required_fields.include?(name)
       end
     end
   end

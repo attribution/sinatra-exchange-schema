@@ -134,6 +134,20 @@ describe Sinatra::ExchangeSchema::Builder do
     end
   end
 
+  describe 'required once' do
+    it 'requires a field once however often it is declared, whatever its kinds' do
+      builder.string :trait, required: true
+      builder.any :trait, required: true
+      builder.object(:meta, required: true) { string :source }
+      builder.object(:meta, required: true) { string :source }
+      builder.array :tags, required: true, items: :string
+      builder.array :tags, required: true, items: :string
+      builder.map :totals, required: true, values: :integer
+      builder.map :totals, required: true, values: :integer
+      expect(builder.to_json_schema['required']).to eq %w[trait meta tags totals]
+    end
+  end
+
   describe 'description' do
     it 'includes description on a scalar field' do
       builder.string :name, description: 'Full name of the user'
