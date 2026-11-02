@@ -27,6 +27,14 @@ describe Sinatra::ExchangeSchema::RequestValidator do
       expect(described_class.call({ 'name' => 1, 'note' => 'n' }, schema).map { |err| err[:field] }.uniq).to eq(['/name'])
     end
 
+    it 'checks the other keys as the extension said, and the referenced ones as the reference said' do
+      decl = Sinatra::ExchangeSchema::EndpointDeclaration.new(:post, '/articles')
+      decl.body(ref: :Article) { values :integer }
+      decl.close_body!
+      expect(described_class.call({ 'name' => 'One', 'count' => 3 }, decl.body_schema)).to be_nil
+      expect(described_class.call({ 'name' => 'One', 'count' => 'three' }, decl.body_schema).map { |err| err[:field] }).to eq(['/count'])
+    end
+
     it 'rejects a key neither declared, the body being closed as one' do
       errors = described_class.call({ 'name' => 'One', 'nope' => true }, schema)
       expect(errors.map { |err| err[:field] }).to eq(['/nope'])

@@ -110,6 +110,14 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
       expect(decl.body_schema).not_to have_key('additionalProperties')
     end
 
+    it "lifts what the block's values take to the wrapper, past the reference" do
+      decl = described_class.new(:post, '/articles')
+      decl.body(ref: :Article) { values :integer }
+      decl.close_body!
+      expect(decl.body_schema['unevaluatedProperties']).to eq('type' => 'integer')
+      expect(decl.body_schema['allOf'].last).not_to have_key('additionalProperties')
+    end
+
     it 'takes the named schema as a response, alone or extended' do
       decl = described_class.new(:get, '/articles/:id')
       decl.response 200, ref: :Article

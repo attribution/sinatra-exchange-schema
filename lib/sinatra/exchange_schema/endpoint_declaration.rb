@@ -208,7 +208,7 @@ module Sinatra
         builder.instance_eval(&block) if block
         return builder.to_json_schema unless ref
 
-        { 'allOf' => [Schemas.ref(ref), builder.to_json_schema] }
+        Schemas.compose(Schemas.ref(ref), builder.to_json_schema)
       end
       private :composed
 

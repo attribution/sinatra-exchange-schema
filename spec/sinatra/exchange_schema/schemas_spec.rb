@@ -46,6 +46,10 @@ describe Sinatra::ExchangeSchema::Schemas do
   end
 
   describe '.flatten' do
+    it 'skips an allOf member that is a boolean schema' do
+      expect(described_class.flatten({ 'allOf' => [true, { 'type' => 'string' }] })).to eq('type' => 'string')
+    end
+
     it 'leaves a pointer into another document alone' do
       schema = { 'type' => 'array', 'items' => { '$ref' => '#/items/$defs/Row' } }
       expect(described_class.flatten(schema)).to equal schema

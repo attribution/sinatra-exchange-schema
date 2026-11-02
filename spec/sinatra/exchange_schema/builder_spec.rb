@@ -246,6 +246,13 @@ describe Sinatra::ExchangeSchema::Builder do
       expect(prop['allOf'].last['properties'].keys).to eq ['label']
     end
 
+    it "lifts what the block's values take to the wrapper, past the reference" do
+      builder.object(:total, ref: :Row) { values :integer }
+      prop = builder.to_json_schema['properties']['total']
+      expect(prop['unevaluatedProperties']).to eq('type' => 'integer')
+      expect(prop['allOf'].last).not_to have_key('additionalProperties')
+    end
+
     it 'takes a reference as array items and map values' do
       builder.array :rows, items: builder.ref(:Row)
       builder.map :by_id, values: builder.ref(:Row)

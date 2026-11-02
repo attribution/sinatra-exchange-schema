@@ -66,6 +66,15 @@ module Sinatra
           found
         end
 
+        # A named schema extended by an inline one: both in an allOf, and what the extension said
+        # its other keys take lifted to the wrapper as unevaluatedProperties, which sees the keys
+        # the reference declares where the member's own additionalProperties would not.
+        def compose(reference, extension)
+          composed = { 'allOf' => [reference, extension.except('additionalProperties')] }
+          composed['unevaluatedProperties'] = extension['additionalProperties'] if extension.key?('additionalProperties')
+          composed
+        end
+
         # The schema with its references followed and its allOf members merged into one, the way
         # a reader of its properties sees it. For review output, not for validation.
         def flatten(schema)
@@ -76,7 +85,8 @@ module Sinatra
           end
           return schema unless schema.key?('allOf')
 
-          schema['allOf'].map { |member| flatten(member) }.reduce(schema.except('allOf')) do |merged, member|
+          members = schema['allOf'].map { |member| flatten(member) }.select { |member| member.is_a?(Hash) }
+          members.reduce(schema.except('allOf')) do |merged, member|
             merged.merge(member) do |key, mine, theirs|
               case key
               when 'properties' then mine.merge(theirs)

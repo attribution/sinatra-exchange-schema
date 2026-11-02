@@ -98,7 +98,7 @@ module Sinatra
           if block
             nested = self.class.new
             nested.instance_eval(&block)
-            prop = { 'allOf' => [prop, nested.to_json_schema] }
+            prop = Schemas.compose(prop, nested.to_json_schema)
           end
           prop['description'] = description if description
           @properties[name] = prop
