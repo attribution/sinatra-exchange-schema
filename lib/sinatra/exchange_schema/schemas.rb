@@ -8,7 +8,8 @@ module Sinatra
       PATH = '#/components/schemas/'.freeze
       # An OpenAPI component key: https://spec.openapis.org/oas/v3.1.0#components-object
       NAME = /\A[A-Za-z0-9._-]+\z/
-      # The keywords whose values are data, not schemas, so a hash under them is never a reference.
+      # The keywords whose values are data, not schemas, so a hash under them is never a reference;
+      # so is everything under a specification extension, an x- key.
       DATA_KEYWORDS = %w[enum const default example examples].freeze
       # The keywords whose values are schemas keyed by name: a key there is a name, not a keyword.
       NAMED_SCHEMAS = %w[properties patternProperties dependentSchemas $defs definitions].freeze
@@ -119,7 +120,7 @@ module Sinatra
           when Hash
             yield name_of(node['$ref']) if named?(node['$ref'])
             node.each do |key, value|
-              next if DATA_KEYWORDS.include?(key)
+              next if DATA_KEYWORDS.include?(key) || key.start_with?('x-')
 
               if NAMED_SCHEMAS.include?(key) && value.is_a?(Hash)
                 value.each_value { |child| walk(child, &block) }

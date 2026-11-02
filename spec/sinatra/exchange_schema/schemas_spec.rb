@@ -20,13 +20,14 @@ describe Sinatra::ExchangeSchema::Schemas do
   end
 
   describe '.referenced' do
-    it 'leaves data alone: a hash under enum, const, default or examples is not a reference' do
+    it 'leaves data alone: a hash under enum, const, default, examples or an x- extension is not a reference' do
       schema = {
         'type' => 'object',
         'properties' => {
           'kind' => { 'type' => 'object', 'enum' => [{ '$ref' => '#/components/schemas/Nope' }], 'default' => { '$ref' => '#/components/schemas/Nope' } }
         },
-        'examples' => [{ '$ref' => '#/components/schemas/Nope' }]
+        'examples' => [{ '$ref' => '#/components/schemas/Nope' }],
+        'x-sample' => { '$ref' => '#/components/schemas/Nope' }
       }
       expect(described_class.referenced(schema)).to eq []
       expect(described_class.resolve(schema)).to equal schema
