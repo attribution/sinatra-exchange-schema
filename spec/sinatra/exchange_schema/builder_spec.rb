@@ -134,6 +134,20 @@ describe Sinatra::ExchangeSchema::Builder do
     end
   end
 
+  describe 'required once' do
+    it 'requires a field once however often it is declared, whatever its kinds' do
+      builder.string :trait, required: true
+      builder.any :trait, required: true
+      builder.object(:meta, required: true) { string :source }
+      builder.object(:meta, required: true) { string :source }
+      builder.array :tags, required: true, items: :string
+      builder.array :tags, required: true, items: :string
+      builder.map :totals, required: true, values: :integer
+      builder.map :totals, required: true, values: :integer
+      expect(builder.to_json_schema['required']).to eq %w[trait meta tags totals]
+    end
+  end
+
   describe 'description' do
     it 'includes description on a scalar field' do
       builder.string :name, description: 'Full name of the user'
@@ -192,6 +206,21 @@ describe Sinatra::ExchangeSchema::Builder do
     it 'compiles a nullable opaque object' do
       builder.object :metadata, nullable: true
       expect(schema['properties']['metadata']).to eq('type' => %w[object null])
+    end
+  end
+
+  describe 'any' do
+    it 'declares every JSON type' do
+      builder.any :trait, description: 'As the client sent it'
+      expect(builder.to_json_schema['properties']['trait']).to eq(
+        'type' => %w[string integer number boolean object array null],
+        'description' => 'As the client sent it'
+      )
+    end
+
+    it 'tracks required' do
+      builder.any :trait, required: true
+      expect(builder.to_json_schema['required']).to eq ['trait']
     end
   end
 

@@ -84,5 +84,25 @@ describe Sinatra::ExchangeSchema::ResponseValidator do
         expect(described_class.call(payload, schema).map { |err| err[:field] }).to eq(['/by_article/7/total/views'])
       end
     end
+
+    context 'with a field that takes any JSON value' do
+      let(:schema) do
+        builder = Sinatra::ExchangeSchema::Builder.new
+        builder.integer :id, required: true
+        builder.any :attribute, required: true
+        builder.to_json_schema
+      end
+
+      it 'passes whatever arrives under it' do
+        ['Alice', 42, true, nil, %w[a b], { 'preferred' => 'Alice' }].each do |value|
+          expect(described_class.call({ 'id' => 1, 'attribute' => value }, schema)).to be_nil
+        end
+      end
+
+      it 'still requires it, and still checks its siblings' do
+        expect(described_class.call({ 'id' => 1 }, schema).map { |err| err[:field] }).to eq([''])
+        expect(described_class.call({ 'id' => 'one', 'attribute' => nil }, schema).map { |err| err[:field] }).to eq(['/id'])
+      end
+    end
   end
 end
