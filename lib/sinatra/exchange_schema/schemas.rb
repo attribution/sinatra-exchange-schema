@@ -10,6 +10,8 @@ module Sinatra
       NAME = /\A[A-Za-z0-9._-]+\z/
       # The keywords whose values are data, not schemas, so a hash under them is never a reference.
       DATA_KEYWORDS = %w[enum const default example examples].freeze
+      # The keywords whose values are schemas keyed by name: a key there is a name, not a keyword.
+      NAMED_SCHEMAS = %w[properties patternProperties dependentSchemas $defs definitions].freeze
 
       class << self
         def registry
@@ -69,7 +71,7 @@ module Sinatra
         def flatten(schema)
           return schema unless schema.is_a?(Hash)
 
-          if schema.key?('$ref')
+          if named?(schema['$ref'])
             return flatten(fetch(schema['$ref'].delete_prefix(PATH))).merge(schema.except('$ref'))
           end
           return schema unless schema.key?('allOf')
@@ -91,11 +93,24 @@ module Sinatra
 
         private
 
+        # A reference into the named schemas; any other pointer is left to its own document.
+        def named?(ref)
+          ref.is_a?(String) && ref.start_with?(PATH)
+        end
+
         def walk(node, &block)
           case node
           when Hash
-            yield node['$ref'].delete_prefix(PATH) if node['$ref'].is_a?(String) && node['$ref'].start_with?(PATH)
-            node.each { |key, value| walk(value, &block) unless DATA_KEYWORDS.include?(key) }
+            yield node['$ref'].delete_prefix(PATH) if named?(node['$ref'])
+            node.each do |key, value|
+              next if DATA_KEYWORDS.include?(key)
+
+              if NAMED_SCHEMAS.include?(key) && value.is_a?(Hash)
+                value.each_value { |child| walk(child, &block) }
+              else
+                walk(value, &block)
+              end
+            end
           when Array
             node.each { |value| walk(value, &block) }
           end

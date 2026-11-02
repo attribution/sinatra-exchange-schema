@@ -32,6 +32,12 @@ describe Sinatra::ExchangeSchema::Schemas do
       expect(described_class.resolve(schema)).to equal schema
     end
 
+    it 'reads a property named like a data keyword as a name, and finds the reference under it' do
+      described_class.define(:Row) { integer :views }
+      schema = { 'type' => 'object', 'properties' => { 'default' => { '$ref' => '#/components/schemas/Row' }, 'enum' => { 'type' => 'string', 'enum' => %w[a b] } } }
+      expect(described_class.referenced(schema)).to eq ['Row']
+    end
+
     it 'follows references transitively, each once' do
       described_class.define(:Row) { integer :views }
       described_class.define(:Totals) { object :total, ref: :Row; array :rows, items: ref(:Row) }
@@ -40,6 +46,12 @@ describe Sinatra::ExchangeSchema::Schemas do
   end
 
   describe '.flatten' do
+    it 'leaves a pointer into another document alone' do
+      schema = { 'type' => 'array', 'items' => { '$ref' => '#/items/$defs/Row' } }
+      expect(described_class.flatten(schema)).to equal schema
+      expect(described_class.flatten(schema['items'])).to equal schema['items']
+    end
+
     it 'follows a reference and merges allOf members, properties and required alike' do
       described_class.define(:Row) { integer :views, required: true }
       composed = { 'allOf' => [{ '$ref' => '#/components/schemas/Row' }, { 'type' => 'object', 'properties' => { 'label' => { 'type' => 'string' } }, 'required' => ['label'] }], 'description' => 'A row' }
