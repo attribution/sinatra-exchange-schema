@@ -81,8 +81,9 @@ module Sinatra
         def flatten(schema)
           return schema unless schema.is_a?(Hash)
 
-          if named?(schema['$ref']) && schema['$ref'] == PATH + name_of(schema['$ref'])
-            return flatten(fetch(name_of(schema['$ref']))).merge(schema.except('$ref'))
+          ref = ref_of(schema)
+          if named?(ref) && ref == PATH + name_of(ref)
+            return flatten(fetch(name_of(ref))).merge(schema.except('$ref', :'$ref'))
           end
           return schema unless schema.key?('allOf')
 
@@ -104,6 +105,11 @@ module Sinatra
 
         private
 
+        # The reference a schema carries, under a string or a symbol key, as json_schemer reads both.
+        def ref_of(node)
+          node['$ref'] || node[:'$ref']
+        end
+
         # A reference into the named schemas; any other pointer is left to its own document.
         def named?(ref)
           ref.is_a?(String) && ref.start_with?(PATH)
@@ -118,8 +124,9 @@ module Sinatra
         def walk(node, &block)
           case node
           when Hash
-            yield name_of(node['$ref']) if named?(node['$ref'])
+            yield name_of(ref_of(node)) if named?(ref_of(node))
             node.each do |key, value|
+              key = key.to_s
               next if DATA_KEYWORDS.include?(key) || key.start_with?('x-')
 
               if NAMED_SCHEMAS.include?(key) && value.is_a?(Hash)

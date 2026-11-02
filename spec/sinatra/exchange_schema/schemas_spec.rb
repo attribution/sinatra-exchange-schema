@@ -47,6 +47,14 @@ describe Sinatra::ExchangeSchema::Schemas do
       expect(described_class.flatten(deep['items'])).to equal deep['items']
     end
 
+    it 'reads a reference under a symbol key, as json_schemer does' do
+      described_class.define(:Row) { integer :views }
+      symbol_keyed = { 'type' => 'array', 'items' => { '$ref': '#/components/schemas/Row' } }
+      expect(described_class.referenced(symbol_keyed)).to eq ['Row']
+      expect(Sinatra::ExchangeSchema::ResponseValidator.call([{ 'views' => 1 }], symbol_keyed)).to be_nil
+      expect(described_class.flatten(symbol_keyed['items'])['properties'].keys).to eq ['views']
+    end
+
     it 'follows references transitively, each once' do
       described_class.define(:Row) { integer :views }
       described_class.define(:Totals) { object :total, ref: :Row; array :rows, items: ref(:Row) }
