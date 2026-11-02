@@ -6,16 +6,30 @@ module Sinatra
   module ExchangeSchema
     module Schemas
       PATH = '#/components/schemas/'.freeze
+      # An OpenAPI component key: https://spec.openapis.org/oas/v3.1.0#components-object
+      NAME = /\A[A-Za-z0-9._-]+\z/
+      # The keywords whose values are data, not schemas, so a hash under them is never a reference.
+      DATA_KEYWORDS = %w[enum const default example examples].freeze
 
       class << self
         def registry
           @registry ||= {}
         end
 
+        # Defines a schema once: the same name again takes the same shape or raises, so one app's
+        # definition never silently replaces another's.
         def define(name, &block)
+          name = name.to_s
+          raise ArgumentError, "Schema name #{name.inspect} must be letters, digits, dots, dashes or underscores" unless name.match?(NAME)
+
           builder = Builder.new
           builder.instance_eval(&block)
-          registry[name.to_s] = builder.to_json_schema
+          schema = builder.to_json_schema
+          if registry.key?(name) && registry[name] != schema
+            raise ArgumentError, "Schema #{name.inspect} is already defined with another shape"
+          end
+
+          registry[name] = schema
         end
 
         def fetch(name)
@@ -50,6 +64,27 @@ module Sinatra
           found
         end
 
+        # The schema with its references followed and its allOf members merged into one, the way
+        # a reader of its properties sees it. For review output, not for validation.
+        def flatten(schema)
+          return schema unless schema.is_a?(Hash)
+
+          if schema.key?('$ref')
+            return flatten(fetch(schema['$ref'].delete_prefix(PATH))).merge(schema.except('$ref'))
+          end
+          return schema unless schema.key?('allOf')
+
+          schema['allOf'].map { |member| flatten(member) }.reduce(schema.except('allOf')) do |merged, member|
+            merged.merge(member) do |key, mine, theirs|
+              case key
+              when 'properties' then mine.merge(theirs)
+              when 'required' then (mine + theirs).uniq
+              else theirs
+              end
+            end
+          end
+        end
+
         def clear
           registry.clear
         end
@@ -60,7 +95,7 @@ module Sinatra
           case node
           when Hash
             yield node['$ref'].delete_prefix(PATH) if node['$ref'].is_a?(String) && node['$ref'].start_with?(PATH)
-            node.each_value { |value| walk(value, &block) }
+            node.each { |key, value| walk(value, &block) unless DATA_KEYWORDS.include?(key) }
           when Array
             node.each { |value| walk(value, &block) }
           end
