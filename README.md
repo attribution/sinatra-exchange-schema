@@ -116,6 +116,36 @@ end
 
 Inside a block, `map` declares the same shape as a property — see [Schema Builder DSL](#schema-builder-dsl).
 
+### Named Schemas
+
+A schema several endpoints share is declared once on the app, with the same DSL as a body, and referenced by name.
+Declare it before the endpoints that reference it:
+
+```ruby
+schema :Article do
+  integer :id, required: true
+  string  :name, required: true
+end
+
+endpoint :post, '/articles' do
+  body ref: :Article do          # the named schema, extended with this endpoint's own fields
+    string :note
+  end
+  response 200, ref: :Article    # the named schema alone
+end
+
+endpoint :get, '/articles' do
+  response 200, items: ref(:Article)
+end
+```
+
+`ref:` takes a named schema on `body`, `response` and `object`; `ref(name)` is the reference itself, for `items:`
+and `values:`. A block beside `ref:` extends the schema in an `allOf`. The generated document carries each named
+schema once under `components/schemas` and every operation points at it with `$ref`; validation resolves the same
+references, so a payload is checked against the composed schema exactly as against an inline one. A body built on a
+named schema closes with `unevaluatedProperties` rather than `additionalProperties`, which cannot see the keys a
+reference declares (see [Undeclared Body Keys](#undeclared-body-keys)).
+
 ### Non-JSON Responses
 
 A body that is not JSON — a CSV file, plain text — is declared by its media type alone. The generated spec publishes the
@@ -233,6 +263,7 @@ The `body`, `query`, `path`, and `response` blocks use a builder DSL with these 
 | `map`     | `required:`, `nullable:`, `values:`, `description:`, block |
 | `values`  | a type, a schema hash, or a block: what every key not named in the block takes |
 | `any`     | `required:`, `description:` — any JSON value, as the full type list |
+| `ref(name)` | a reference to a named schema, for `items:` and `values:`; `object` takes `ref:` instead |
 
 `format:` takes a JSON Schema format name (`date`, `date-time`, `email`, `uri`, …). json_schemer validates it under the
 gem's default options, so `string :start_date, format: :date` rejects `2026-13-01` at request time, and the OpenAPI
@@ -304,7 +335,9 @@ it back on:
 Sinatra::ExchangeSchema.additional_properties = true   # default: false
 ```
 
-A body that declares `values` has said what its other keys take, and keeps that whatever the setting.
+A body that declares `values` has said what its other keys take, and keeps that whatever the setting. A body built
+on a [named schema](#named-schemas) closes with `unevaluatedProperties: false` instead: `additionalProperties` does
+not see the keys a `$ref` or an `allOf` member declares, and would reject every one of them.
 
 This is orthogonal to the modes above: `additional_properties` decides what counts as a
 violation, `request_validation` decides what happens to one. Leaving it closed while

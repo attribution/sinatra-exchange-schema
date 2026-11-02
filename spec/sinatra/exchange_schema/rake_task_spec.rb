@@ -268,6 +268,24 @@ describe Sinatra::ExchangeSchema::RakeTask do
       TABLE
     end
 
+    it 'dumps the fields of a response built on a named schema, references followed' do
+      Sinatra::ExchangeSchema.schema(:Article) { integer :id; string :name }
+      whole = Sinatra::ExchangeSchema::EndpointDeclaration.new(:get, '/articles/:id')
+      whole.instance_eval { response 200, ref: :Article }
+      extended = Sinatra::ExchangeSchema::EndpointDeclaration.new(:post, '/articles')
+      extended.instance_eval { response(200, ref: :Article) { string :note } }
+      list = Sinatra::ExchangeSchema::EndpointDeclaration.new(:get, '/articles')
+      list.instance_eval { response 200, items: ref(:Article) }
+
+      table = described_class.data_types_table([whole, extended, list])
+
+      expect(table).to include('GET /articles/:id').and include('id, name')
+      expect(table).to include('id, name, note')
+      expect(table).to include('[id, name]')
+    ensure
+      Sinatra::ExchangeSchema::Schemas.clear
+    end
+
     it 'dumps the distinct data type vocabulary with DISTINCT=1' do
       allow(ENV).to receive(:[]).and_call_original
       allow(ENV).to receive(:[]).with('DISTINCT').and_return('1')

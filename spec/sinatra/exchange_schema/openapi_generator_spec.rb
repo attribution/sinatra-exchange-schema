@@ -284,6 +284,42 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
       expect(doc['security']).to eq [{ 'bearer' => [] }]
     end
 
+    it 'emits the named schemas the declarations reference under components, each once' do
+      Sinatra::ExchangeSchema.schema(:Row) { integer :views, required: true }
+      Sinatra::ExchangeSchema.schema(:Totals) { object :total, ref: :Row, required: true }
+      Sinatra::ExchangeSchema.schema(:Unused) { string :never }
+      first = build_declaration(:get, '/first') { response 200, ref: :Totals }
+      second = build_declaration(:get, '/second') { response(200) { map :by_id, values: ref(:Row) } }
+
+      doc = described_class.call([first, second])
+
+      expect(doc.dig('components', 'schemas').keys).to match_array %w[Totals Row]
+      expect(doc.dig('components', 'schemas', 'Totals', 'properties', 'total')).to eq('$ref' => '#/components/schemas/Row')
+      expect(doc.dig('paths', '/first', 'get', 'responses', '200', 'content', 'application/json', 'schema')).to eq('$ref' => '#/components/schemas/Totals')
+    ensure
+      Sinatra::ExchangeSchema::Schemas.clear
+    end
+
+    it 'emits the schema a deeper pointer reaches into' do
+      Sinatra::ExchangeSchema.schema(:Row) { integer :views }
+      decl = build_declaration(:get, '/views') { response 200, items: { '$ref' => '#/components/schemas/Row/properties/views' } }
+
+      expect(described_class.call([decl]).dig('components', 'schemas').keys).to eq ['Row']
+    ensure
+      Sinatra::ExchangeSchema::Schemas.clear
+    end
+
+    it 'keeps the security schemes beside the named schemas under components' do
+      Sinatra::ExchangeSchema.schema(:Row) { integer :views }
+      decl = build_declaration(:get, '/rows') { security :bearer; response 200, ref: :Row }
+
+      doc = described_class.call([decl])
+
+      expect(doc['components'].keys).to match_array %w[securitySchemes schemas]
+    ensure
+      Sinatra::ExchangeSchema::Schemas.clear
+    end
+
     it 'emits declared data types as x-data-types on the operation' do
       decl = build_declaration(:get, '/users/:id', summary: 'Show') do
         data_types :email, :postal_address

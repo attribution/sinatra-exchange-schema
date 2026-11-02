@@ -99,8 +99,9 @@ module Sinatra
         schema = declaration.response_schemas.find { |status, _| status.between?(200, 299) }&.last
         return '-' unless schema
 
+        schema = Schemas.flatten(schema)
         if Array(schema['type']).include?('array')
-          items = schema['items'] || {}
+          items = Schemas.flatten(schema['items'] || {})
           names = items['properties'] ? items['properties'].keys : [items['type']].compact
           "[#{names.join(', ')}]"
         else

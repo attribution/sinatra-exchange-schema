@@ -6,6 +6,8 @@
 # map (an object keyed by data, with +values+ symbol or hash, or a nested block)
 # Inside any block, +values+ declares what every key not named there takes.
 # +any+ declares a field that takes any JSON value, as the full type list.
+# +object+ with +ref:+ takes a named schema, extended by its block when there is one;
+# +ref(name)+ is the reference itself, for array items or map values.
 #
 # == Usage
 #
@@ -82,9 +84,25 @@ module Sinatra
         require_field(name) if required
       end
 
-      def object(name, required: false, nullable: false, description: nil, &block)
+      # A reference to a named schema, for +items:+ or +values:+.
+      def ref(name)
+        Schemas.ref(name)
+      end
+
+      def object(name, ref: nil, required: false, nullable: false, description: nil, &block)
         name = name.to_s
-        if block
+        if ref
+          raise ArgumentError, 'a reference cannot be nullable' if nullable
+
+          prop = Schemas.ref(ref)
+          if block
+            nested = self.class.new
+            nested.instance_eval(&block)
+            prop = Schemas.compose(prop, nested.to_json_schema)
+          end
+          prop['description'] = description if description
+          @properties[name] = prop
+        elsif block
           nested = self.class.new
           nested.instance_eval(&block)
           schema = nested.to_json_schema

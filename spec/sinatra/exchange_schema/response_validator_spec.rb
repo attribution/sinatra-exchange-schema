@@ -85,6 +85,38 @@ describe Sinatra::ExchangeSchema::ResponseValidator do
       end
     end
 
+    context 'through a named schema, nested and as map values' do
+      before do
+        Sinatra::ExchangeSchema.schema(:Row) { integer :views, required: true }
+      end
+
+      after do
+        Sinatra::ExchangeSchema::Schemas.clear
+      end
+
+      let(:schema) do
+        builder = Sinatra::ExchangeSchema::Builder.new
+        builder.object :total, ref: :Row, required: true
+        builder.map :by_id, values: builder.ref(:Row)
+        builder.to_json_schema
+      end
+
+      it 'passes a payload the named schema fits' do
+        expect(described_class.call({ 'total' => { 'views' => 3 }, 'by_id' => { '7' => { 'views' => 1 } } }, schema)).to be_nil
+      end
+
+      it 'fails through the reference, naming the field' do
+        result = described_class.call({ 'total' => { 'views' => 'three' }, 'by_id' => { '7' => {} } }, schema)
+        expect(result.map { |err| err[:field] }).to eq(['/total/views', '/by_id/7'])
+      end
+
+      it 'resolves a pointer deeper into a named schema' do
+        deep = { 'type' => 'array', 'items' => { '$ref' => '#/components/schemas/Row/properties/views' } }
+        expect(described_class.call([1, 2], deep)).to be_nil
+        expect(described_class.call([1, 'two'], deep).map { |err| err[:field] }).to eq(['/1'])
+      end
+    end
+
     context 'with a field that takes any JSON value' do
       let(:schema) do
         builder = Sinatra::ExchangeSchema::Builder.new

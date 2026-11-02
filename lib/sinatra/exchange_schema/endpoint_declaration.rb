@@ -94,11 +94,15 @@ module Sinatra
       end
 
       # Define a JSON Schema for the request body.
-      # The block is evaluated in the context of a ExchangeSchema::Builder.
-      def body(&block)
-        builder = Builder.new
-        builder.instance_eval(&block)
-        @body_schema = builder.to_json_schema
+      # The block is evaluated in the context of a ExchangeSchema::Builder. With +ref:+ the body
+      # is the named schema, extended by the block when there is one.
+      def body(ref: nil, &block)
+        @body_schema = composed(ref, &block)
+      end
+
+      # A reference to a named schema, for +items:+ or +values:+.
+      def ref(name)
+        Schemas.ref(name)
       end
 
       # Rejects body keys this endpoint never declared. Called by the +endpoint+ DSL once the
@@ -106,11 +110,21 @@ module Sinatra
       #
       # Only the top level closes. Nested objects stay open: +object :settings+ with no block
       # declares no properties at all, so closing it would reject every key inside. A body that
-      # declared +values+ said what its other keys take, and keeps that.
+      # declared +values+ said what its other keys take, and keeps that. A body built on a named
+      # schema closes with +unevaluatedProperties+: +additionalProperties+ cannot see the keys a
+      # reference or an +allOf+ member declares, and would reject every one of them.
       def close_body!
-        return if @body_schema.nil? || @body_schema.key?('additionalProperties')
+        return if @body_schema.nil?
 
-        @body_schema = @body_schema.merge('additionalProperties' => false)
+        if @body_schema.key?('$ref') || @body_schema.key?('allOf')
+          return if @body_schema.key?('unevaluatedProperties')
+
+          @body_schema = @body_schema.merge('unevaluatedProperties' => false)
+        else
+          return if @body_schema.key?('additionalProperties')
+
+          @body_schema = @body_schema.merge('additionalProperties' => false)
+        end
       end
 
       # Define a JSON Schema for query-string parameters.
@@ -159,26 +173,44 @@ module Sinatra
       # A status may take several forms, one per media type: a CSV file and, when there is none, a
       # JSON body. Each declaration adds or replaces the form of its media type; the filter validates
       # a JSON body against the JSON form and leaves the others alone.
-      def response(status_code, items: nil, values: nil, content: nil, &block)
+      #
+      # With +ref:+ the response is the named schema, extended by the block when there is one:
+      #   response 200, ref: :Article
+      #     => { '$ref' => '#/components/schemas/Article' }
+      #   response 200, ref: :Article do ... end
+      #     => { allOf: [{ '$ref' => ... }, { type: 'object', properties: {...} }] }
+      def response(status_code, items: nil, values: nil, content: nil, ref: nil, &block)
         if content && content != JSON_CONTENT_TYPE
-          raise ArgumentError, "a #{content} response takes no schema" if items || values || block
+          raise ArgumentError, "a #{content} response takes no schema" if items || values || ref || block
 
           @other_forms[status_code.to_i] ||= {}
           return @other_forms[status_code.to_i][content] = { 'type' => 'string' }
         end
         raise ArgumentError, 'a response is an array (items:) or a map (values:), not both' if items && values
+        raise ArgumentError, 'a response built on a named schema (ref:) takes no items: or values:' if ref && (items || values)
 
         schema = if items
           { 'type' => 'array', 'items' => element_schema(items, &block) }
         elsif values
           { 'type' => 'object', 'additionalProperties' => element_schema(values, &block) }
         else
-          builder = Builder.new
-          builder.instance_eval(&block) if block
-          builder.to_json_schema
+          composed(ref, &block)
         end
         @json_schemas[status_code.to_i] = schema
       end
+
+      # An object built by the block, or the named schema +ref+ names, extended by the block in an
+      # +allOf+ when there is one.
+      def composed(ref, &block)
+        return Schemas.ref(ref) if ref && !block
+
+        builder = Builder.new
+        builder.instance_eval(&block) if block
+        return builder.to_json_schema unless ref
+
+        Schemas.compose(Schemas.ref(ref), builder.to_json_schema)
+      end
+      private :composed
 
       # The schema of an array's elements or a map's values: a block builds an object, a symbol
       # names a type, a hash is taken as it is.

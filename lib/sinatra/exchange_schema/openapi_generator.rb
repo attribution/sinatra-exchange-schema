@@ -40,11 +40,22 @@ module Sinatra
           }
         end
 
+        # the named schemas these declarations reference, each once, where their $ref points
+        schemas = Schemas.registry.slice(*Schemas.referenced(*declarations.flat_map { |d| schemas_of(d) }))
+        if schemas.any?
+          doc['components'] ||= {}
+          doc['components']['schemas'] = schemas
+        end
+
         doc
       end
 
       class << self
         private
+
+        def schemas_of(decl)
+          [decl.body_schema, decl.query_schema, decl.path_schema, *decl.response_forms.values.flat_map(&:values)].compact
+        end
 
         def convert_path(sinatra_path)
           sinatra_path.gsub(/:(\w+)/, '{\1}')
