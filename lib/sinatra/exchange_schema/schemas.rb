@@ -81,14 +81,17 @@ module Sinatra
         def flatten(schema)
           return schema unless schema.is_a?(Hash)
 
+          # a whole-schema reference is one more member beside the allOf's, all merged onto the
+          # schema's own keywords; a deeper or foreign pointer stays where it is
           ref = ref_of(schema)
-          if named?(ref) && ref == PATH + name_of(ref)
-            return flatten(fetch(name_of(ref))).merge(schema.except('$ref', :'$ref'))
-          end
-          return schema unless schema.key?('allOf')
+          followed = named?(ref) && ref == PATH + name_of(ref)
+          members = Array(schema['allOf'])
+          members = [fetch(name_of(ref)), *members] if followed
+          return schema if members.empty?
 
-          members = schema['allOf'].map { |member| flatten(member) }.select { |member| member.is_a?(Hash) }
-          members.reduce(schema.except('allOf')) do |merged, member|
+          own = schema.except('allOf')
+          own = own.except('$ref', :'$ref') if followed
+          members.map { |member| flatten(member) }.select { |member| member.is_a?(Hash) }.reduce(own) do |merged, member|
             merged.merge(member) do |key, mine, theirs|
               case key
               when 'properties' then mine.merge(theirs)

@@ -63,6 +63,17 @@ describe Sinatra::ExchangeSchema::Schemas do
   end
 
   describe '.flatten' do
+    it 'merges an allOf beside a reference, both into the fields' do
+      described_class.define(:Row) { integer :views, required: true }
+      described_class.define(:Label) { string :label, required: true }
+      side_by_side = { '$ref' => '#/components/schemas/Row', 'allOf' => [{ '$ref' => '#/components/schemas/Label' }], 'description' => 'Both' }
+      flat = described_class.flatten(side_by_side)
+      expect(flat['properties'].keys).to eq %w[views label]
+      expect(flat['required']).to eq %w[views label]
+      expect(flat).to include('description' => 'Both')
+      expect(flat).not_to have_key('$ref')
+    end
+
     it 'skips an allOf member that is a boolean schema' do
       expect(described_class.flatten({ 'allOf' => [true, { 'type' => 'string' }] })).to eq('type' => 'string')
     end
