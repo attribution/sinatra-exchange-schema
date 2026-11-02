@@ -224,6 +224,44 @@ describe Sinatra::ExchangeSchema::Builder do
     end
   end
 
+  describe 'ref' do
+    before do
+      Sinatra::ExchangeSchema.schema(:Row) { integer :views, required: true }
+    end
+
+    after do
+      Sinatra::ExchangeSchema::Schemas.clear
+    end
+
+    it 'points an object at a named schema, the description beside the reference' do
+      builder.object :total, ref: :Row, required: true, description: 'The row'
+      expect(builder.to_json_schema['properties']['total']).to eq('$ref' => '#/components/schemas/Row', 'description' => 'The row')
+      expect(builder.to_json_schema['required']).to eq ['total']
+    end
+
+    it 'extends a named schema with the block, in an allOf' do
+      builder.object(:total, ref: :Row) { string :label }
+      prop = builder.to_json_schema['properties']['total']
+      expect(prop['allOf'].first).to eq('$ref' => '#/components/schemas/Row')
+      expect(prop['allOf'].last['properties'].keys).to eq ['label']
+    end
+
+    it 'takes a reference as array items and map values' do
+      builder.array :rows, items: builder.ref(:Row)
+      builder.map :by_id, values: builder.ref(:Row)
+      expect(builder.to_json_schema['properties']['rows']['items']).to eq('$ref' => '#/components/schemas/Row')
+      expect(builder.to_json_schema['properties']['by_id']['additionalProperties']).to eq('$ref' => '#/components/schemas/Row')
+    end
+
+    it 'refuses a name nothing defined' do
+      expect { builder.object :total, ref: :Nope }.to raise_error(ArgumentError, /Unknown schema: :Nope/)
+    end
+
+    it 'refuses a nullable reference' do
+      expect { builder.object :total, ref: :Row, nullable: true }.to raise_error(ArgumentError, /nullable/)
+    end
+  end
+
   describe 'map' do
     it 'compiles scalar values from a symbol' do
       builder.map :totals, values: :integer

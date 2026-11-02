@@ -84,6 +84,52 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
     end
   end
 
+  describe '#body and #response with ref:' do
+    before do
+      Sinatra::ExchangeSchema.schema(:Article) { string :name, required: true }
+    end
+
+    after do
+      Sinatra::ExchangeSchema::Schemas.clear
+    end
+
+    it 'takes the named schema as the body, and closes it with unevaluatedProperties' do
+      decl = described_class.new(:post, '/articles')
+      decl.body ref: :Article
+      decl.close_body!
+      expect(decl.body_schema).to eq('$ref' => '#/components/schemas/Article', 'unevaluatedProperties' => false)
+    end
+
+    it 'extends the named schema with the block, closed as one' do
+      decl = described_class.new(:post, '/articles')
+      decl.body(ref: :Article) { string :note }
+      decl.close_body!
+      expect(decl.body_schema['allOf'].first).to eq('$ref' => '#/components/schemas/Article')
+      expect(decl.body_schema['allOf'].last['properties'].keys).to eq ['note']
+      expect(decl.body_schema).to include('unevaluatedProperties' => false)
+      expect(decl.body_schema).not_to have_key('additionalProperties')
+    end
+
+    it 'takes the named schema as a response, alone or extended' do
+      decl = described_class.new(:get, '/articles/:id')
+      decl.response 200, ref: :Article
+      decl.response(201, ref: :Article) { integer :id, required: true }
+      expect(decl.json_schema(200)).to eq('$ref' => '#/components/schemas/Article')
+      expect(decl.json_schema(201)['allOf'].last['required']).to eq ['id']
+    end
+
+    it 'takes a reference as the items of an array response' do
+      decl = described_class.new(:get, '/articles')
+      decl.response 200, items: decl.ref(:Article)
+      expect(decl.json_schema(200)).to eq('type' => 'array', 'items' => { '$ref' => '#/components/schemas/Article' })
+    end
+
+    it 'refuses ref: beside items: or values:' do
+      decl = described_class.new(:get, '/articles')
+      expect { decl.response 200, ref: :Article, items: :string }.to raise_error(ArgumentError, /ref:/)
+    end
+  end
+
   describe '#additional_properties' do
     it 'defaults to nil so the controller or app decides' do
       decl = described_class.new(:post, '/articles')

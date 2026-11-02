@@ -29,6 +29,7 @@ require 'json'
 require 'sinatra/base'
 require_relative 'exchange_schema/version'
 require_relative 'exchange_schema/builder'
+require_relative 'exchange_schema/schemas'
 require_relative 'exchange_schema/endpoint_declaration'
 require_relative 'exchange_schema/request_validator'
 require_relative 'exchange_schema/response_validator'
@@ -66,6 +67,21 @@ module Sinatra
 
         raise ArgumentError, "Invalid mode #{mode.inspect}, must be one of #{VALID_MODES.inspect}"
       end
+    end
+
+    # A named schema, shared across endpoints: declared once with the Builder DSL, referenced by
+    # name with +ref:+ on a body, a response or an object, or +ref(name)+ as array items or map
+    # values. Define it before the declarations that reference it.
+    def self.schema(name, &block)
+      Schemas.define(name, &block)
+    end
+
+    def self.schemas
+      Schemas.registry
+    end
+
+    def self.ref(name)
+      Schemas.ref(name)
     end
 
     # App-wide defaults
@@ -234,6 +250,11 @@ module Sinatra
       when :missing_schema
         raise MissingEndpointSchemaError, message
       end
+    end
+
+    # Declare a named schema on the app, shared across its endpoints; see ExchangeSchema.schema.
+    def schema(name, &block)
+      ::Sinatra::ExchangeSchema.schema(name, &block)
     end
 
     # Declare an endpoint schema. Place directly above the corresponding

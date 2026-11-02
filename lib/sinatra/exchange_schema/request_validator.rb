@@ -13,7 +13,7 @@ module Sinatra
       def self.call(payload, schema_hash)
         return if schema_hash.nil?
 
-        schemer = JSONSchemer.schema(schema_hash)
+        schemer = JSONSchemer.schema(Schemas.resolve(schema_hash))
         errors = schemer.validate(payload).to_a
         return if errors.empty?
 

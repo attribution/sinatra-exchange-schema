@@ -1,6 +1,38 @@
 require 'spec_helper'
 
 describe Sinatra::ExchangeSchema::RequestValidator do
+  context 'through a named schema' do
+    before do
+      Sinatra::ExchangeSchema.schema(:Article) { string :name, required: true }
+    end
+
+    after do
+      Sinatra::ExchangeSchema::Schemas.clear
+    end
+
+    let(:schema) do
+      decl = Sinatra::ExchangeSchema::EndpointDeclaration.new(:post, '/articles')
+      decl.body(ref: :Article) { string :note }
+      decl.close_body!
+      decl.body_schema
+    end
+
+    it 'passes what the named schema and the extension declare' do
+      expect(described_class.call({ 'name' => 'One', 'note' => 'n' }, schema)).to be_nil
+    end
+
+    # a field that fails inside the reference is reported twice, by the reference and, its
+    # annotations dropped with the failure, as unevaluated: both name the field
+    it 'fails under the named schema, naming the field' do
+      expect(described_class.call({ 'name' => 1, 'note' => 'n' }, schema).map { |err| err[:field] }.uniq).to eq(['/name'])
+    end
+
+    it 'rejects a key neither declared, the body being closed as one' do
+      errors = described_class.call({ 'name' => 'One', 'nope' => true }, schema)
+      expect(errors.map { |err| err[:field] }).to eq(['/nope'])
+    end
+  end
+
   let(:schema) do
     {
       'type' => 'object',
