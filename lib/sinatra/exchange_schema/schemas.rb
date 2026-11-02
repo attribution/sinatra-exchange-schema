@@ -80,8 +80,8 @@ module Sinatra
         def flatten(schema)
           return schema unless schema.is_a?(Hash)
 
-          if named?(schema['$ref'])
-            return flatten(fetch(schema['$ref'].delete_prefix(PATH))).merge(schema.except('$ref'))
+          if named?(schema['$ref']) && schema['$ref'] == PATH + name_of(schema['$ref'])
+            return flatten(fetch(name_of(schema['$ref']))).merge(schema.except('$ref'))
           end
           return schema unless schema.key?('allOf')
 
@@ -108,10 +108,16 @@ module Sinatra
           ref.is_a?(String) && ref.start_with?(PATH)
         end
 
+        # The schema a reference points into: the first segment past the path, a pointer deeper
+        # into it resolving within that schema once it is attached.
+        def name_of(ref)
+          ref.delete_prefix(PATH).split('/').first
+        end
+
         def walk(node, &block)
           case node
           when Hash
-            yield node['$ref'].delete_prefix(PATH) if named?(node['$ref'])
+            yield name_of(node['$ref']) if named?(node['$ref'])
             node.each do |key, value|
               next if DATA_KEYWORDS.include?(key)
 

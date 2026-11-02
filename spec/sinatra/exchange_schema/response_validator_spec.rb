@@ -109,6 +109,12 @@ describe Sinatra::ExchangeSchema::ResponseValidator do
         result = described_class.call({ 'total' => { 'views' => 'three' }, 'by_id' => { '7' => {} } }, schema)
         expect(result.map { |err| err[:field] }).to eq(['/total/views', '/by_id/7'])
       end
+
+      it 'resolves a pointer deeper into a named schema' do
+        deep = { 'type' => 'array', 'items' => { '$ref' => '#/components/schemas/Row/properties/views' } }
+        expect(described_class.call([1, 2], deep)).to be_nil
+        expect(described_class.call([1, 'two'], deep).map { |err| err[:field] }).to eq(['/1'])
+      end
     end
 
     context 'with a field that takes any JSON value' do

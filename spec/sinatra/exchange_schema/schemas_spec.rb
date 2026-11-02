@@ -38,6 +38,14 @@ describe Sinatra::ExchangeSchema::Schemas do
       expect(described_class.referenced(schema)).to eq ['Row']
     end
 
+    it 'reads a pointer deeper into a schema as a reference to that schema' do
+      described_class.define(:Article) { string :name, required: true }
+      deep = { 'type' => 'array', 'items' => { '$ref' => '#/components/schemas/Article/properties/name' } }
+      expect(described_class.referenced(deep)).to eq ['Article']
+      expect(described_class.resolve(deep).dig('components', 'schemas').keys).to eq ['Article']
+      expect(described_class.flatten(deep['items'])).to equal deep['items']
+    end
+
     it 'follows references transitively, each once' do
       described_class.define(:Row) { integer :views }
       described_class.define(:Totals) { object :total, ref: :Row; array :rows, items: ref(:Row) }

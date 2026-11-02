@@ -300,6 +300,15 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
       Sinatra::ExchangeSchema::Schemas.clear
     end
 
+    it 'emits the schema a deeper pointer reaches into' do
+      Sinatra::ExchangeSchema.schema(:Row) { integer :views }
+      decl = build_declaration(:get, '/views') { response 200, items: { '$ref' => '#/components/schemas/Row/properties/views' } }
+
+      expect(described_class.call([decl]).dig('components', 'schemas').keys).to eq ['Row']
+    ensure
+      Sinatra::ExchangeSchema::Schemas.clear
+    end
+
     it 'keeps the security schemes beside the named schemas under components' do
       Sinatra::ExchangeSchema.schema(:Row) { integer :views }
       decl = build_declaration(:get, '/rows') { security :bearer; response 200, ref: :Row }
