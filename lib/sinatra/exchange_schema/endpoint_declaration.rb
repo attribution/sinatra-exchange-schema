@@ -121,16 +121,20 @@ module Sinatra
 
       # Closes every object a JSON form declares to the keys it names: nested objects, array items
       # and map values included, since a response's undeclared keys sit at any depth. An object
-      # without properties stays open, as in a body, and a map keeps its values schema. The forms
-      # are rebuilt, so a schema handed in as +values:+ or +items:+ is not edited.
+      # that names no property stays open, as in a body, a map keeps its values schema, and a
+      # boolean schema, which a hash handed in may carry, passes as it is. The forms are rebuilt,
+      # so a schema handed in as +values:+ or +items:+ is not edited.
       def close_responses!
         @json_schemas = @json_schemas.transform_values { |schema| closed(schema) }
       end
 
       def closed(schema)
+        return schema unless schema.is_a?(Hash)
+
         closed = schema.dup
-        if schema['properties'].is_a?(Hash)
-          closed['properties'] = schema['properties'].transform_values { |property| closed(property) }
+        properties = schema['properties']
+        if properties.is_a?(Hash) && !properties.empty?
+          closed['properties'] = properties.transform_values { |property| closed(property) }
           closed['additionalProperties'] = false unless schema.key?('additionalProperties')
         end
         closed['items'] = closed(schema['items']) if schema['items'].is_a?(Hash)

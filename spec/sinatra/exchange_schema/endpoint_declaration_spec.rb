@@ -156,6 +156,28 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
       expect { decl.close_responses! }.not_to raise_error
       expect(decl.response_schemas).to eq({})
     end
+
+    it 'leaves a response without a block and an object with an empty block open' do
+      decl = described_class.new(:get, '/articles')
+      decl.response 200
+      decl.response 201 do
+        object :settings do
+        end
+      end
+      decl.close_responses!
+      expect(decl.json_schema(200)).not_to have_key('additionalProperties')
+      expect(decl.json_schema(201)['properties']['settings']).not_to have_key('additionalProperties')
+      expect(decl.json_schema(201)['additionalProperties']).to be false
+    end
+
+    it 'passes a boolean schema in a hash handed in as it is' do
+      decl = described_class.new(:get, '/articles')
+      decl.response 200, values: { 'type' => 'object', 'properties' => { 'name' => true, 'tags' => { 'type' => 'array', 'items' => false } } }
+      decl.close_responses!
+      values = decl.json_schema(200)['additionalProperties']
+      expect(values['properties']).to eq('name' => true, 'tags' => { 'type' => 'array', 'items' => false })
+      expect(values['additionalProperties']).to be false
+    end
   end
 
   describe '#response_additional_properties' do
