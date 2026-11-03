@@ -4,7 +4,9 @@
 # app-wide, per-controller, and per-endpoint.
 #
 # Each validation concern (+request_validation+, +response_validation+,
-# +missing_schema+) can be set to +:off+, +:warn+, or +:strict+.
+# +missing_schema+) can be set to +:off+, +:warn+, or +:strict+. Two booleans close what the
+# declarations leave open: +additional_properties+ a request body, +response_additional_properties+
+# every object a response declares.
 #
 # == Usage
 #
@@ -42,7 +44,7 @@ module Sinatra
 
     class << self
       attr_reader :request_validation, :response_validation, :missing_schema
-      attr_accessor :additional_properties
+      attr_accessor :additional_properties, :response_additional_properties
 
       def request_validation=(mode)
         validate_mode!(mode)
@@ -73,6 +75,7 @@ module Sinatra
     self.response_validation = :warn
     self.missing_schema = :warn
     self.additional_properties = false
+    self.response_additional_properties = true
 
     # Called when a Sinatra app registers this extension.
     def self.registered(app)
@@ -82,6 +85,7 @@ module Sinatra
       app.set :response_validation, nil
       app.set :missing_schema, nil
       app.set :additional_properties, nil
+      app.set :response_additional_properties, nil
       app.set :openapi_file, nil
 
       app.before do
@@ -249,6 +253,7 @@ module Sinatra
         decl.openapi_file(settings.openapi_file)
       end
       decl.close_body! unless ExchangeSchema.effective_mode(decl, :additional_properties, settings)
+      decl.close_responses! unless ExchangeSchema.effective_mode(decl, :response_additional_properties, settings)
       endpoint_declarations << decl
     end
   end

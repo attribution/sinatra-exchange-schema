@@ -52,6 +52,12 @@ module Sinatra
         @additional_properties = value
       end
 
+      def response_additional_properties(value = :_unset)
+        return @response_additional_properties if value == :_unset
+
+        @response_additional_properties = value
+      end
+
       def openapi_file(value = :_unset)
         return @openapi_file if value == :_unset
 
@@ -112,6 +118,57 @@ module Sinatra
 
         @body_schema = @body_schema.merge('additionalProperties' => false)
       end
+
+      COMPOSITIONS = %w[allOf oneOf anyOf].freeze
+
+      # Closes every object a JSON form declares to the keys it names: nested objects, array items
+      # and map values included, since a response's undeclared keys sit at any depth. An object
+      # that names no property, itself or through what it composes, stays open, as in a body; a
+      # map keeps its values schema, and a boolean schema, which a hash handed in may carry, passes
+      # as it is. An object that composes
+      # with +allOf+, +oneOf+ or +anyOf+ closes at its top alone, with +unevaluatedProperties+,
+      # which sees the keys the composed schemas declare where +additionalProperties+ would reject
+      # them; beneath it nothing closes, since two composed schemas may describe one nested object
+      # between them. The forms are rebuilt, so a schema handed in as +values:+ or +items:+ is not
+      # edited.
+      def close_responses!
+        @json_schemas = @json_schemas.transform_values { |schema| closed(schema) }
+      end
+
+      # +open+ is set beneath a composition, the schema's own or an outer one: the walk still
+      # rebuilds, so nothing is edited, but closes nothing there, a composition inside one included.
+      def closed(schema, open: false)
+        return schema unless schema.is_a?(Hash)
+
+        beneath = open || composed?(schema)
+        closed = schema.dup
+        properties = schema['properties']
+        closed['properties'] = properties.transform_values { |property| closed(property, open: beneath) } if properties.is_a?(Hash)
+        COMPOSITIONS.each do |keyword|
+          closed[keyword] = schema[keyword].map { |part| closed(part, open: beneath) } if schema[keyword].is_a?(Array)
+        end
+        closed['items'] = closed(schema['items'], open: beneath) if schema['items'].is_a?(Hash)
+        closed['prefixItems'] = schema['prefixItems'].map { |item| closed(item, open: beneath) } if schema['prefixItems'].is_a?(Array)
+        closed['additionalProperties'] = closed(schema['additionalProperties'], open: beneath) if schema['additionalProperties'].is_a?(Hash)
+        return closed if open || schema.key?('additionalProperties') || schema.key?('unevaluatedProperties')
+        return closed unless names_property?(schema)
+
+        closed[composed?(schema) ? 'unevaluatedProperties' : 'additionalProperties'] = false
+        closed
+      end
+
+      def composed?(schema)
+        COMPOSITIONS.any? { |keyword| schema[keyword].is_a?(Array) }
+      end
+
+      # Whether the schema names a property itself or through a schema it composes, at any depth.
+      def names_property?(schema)
+        return false unless schema.is_a?(Hash)
+        return true if schema['properties'].is_a?(Hash) && !schema['properties'].empty?
+
+        COMPOSITIONS.any? { |keyword| schema[keyword].is_a?(Array) && schema[keyword].any? { |part| names_property?(part) } }
+      end
+      private :closed, :composed?, :names_property?
 
       # Define a JSON Schema for query-string parameters.
       # The block is evaluated in the context of a ExchangeSchema::Builder.

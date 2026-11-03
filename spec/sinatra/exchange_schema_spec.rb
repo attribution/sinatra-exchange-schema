@@ -432,6 +432,56 @@ describe Sinatra::ExchangeSchema do
     end
   end
 
+  describe 'closed responses' do
+    include Rack::Test::Methods
+
+    let(:closed_app) do
+      Class.new(Sinatra::Base) do
+        register Sinatra::ExchangeSchema
+        set :response_additional_properties, false
+
+        endpoint :get, '/closed' do
+          response 200 do
+            string :id
+            object :meta do
+              string :source
+            end
+          end
+        end
+        get('/closed') { { id: '1', meta: { source: 'api', extra: true } }.to_json }
+
+        endpoint :get, '/open' do
+          response_additional_properties true
+          response 200 do
+            string :id
+          end
+        end
+        get('/open') { { id: '1', extra: true }.to_json }
+      end
+    end
+
+    def app
+      closed_app
+    end
+
+    it 'refuses a key a nested object never declared' do
+      expect { get '/closed' }.to raise_error(
+        Sinatra::ExchangeSchema::ResponseValidator::ResponseSchemaValidationError, %r{/meta/extra}
+      )
+    end
+
+    it 'leaves an endpoint that opts out open' do
+      get '/open'
+      expect(last_response.status).to eq(200)
+    end
+
+    it 'is open unless set, so a declaration elsewhere stays as written' do
+      expect(Sinatra::ExchangeSchema.response_additional_properties).to be true
+      declaration = test_app.endpoint_declarations.find { |decl| decl.path == '/test_with_response' }
+      expect(declaration.json_schema(200)).not_to have_key('additionalProperties')
+    end
+  end
+
   describe 'after filter response validation' do
     include Rack::Test::Methods
 
