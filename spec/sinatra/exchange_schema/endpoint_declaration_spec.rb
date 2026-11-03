@@ -170,6 +170,19 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
       expect(decl.json_schema(201)['additionalProperties']).to be false
     end
 
+    it 'closes each alternative of a oneOf or anyOf on its own and leaves an allOf member alone' do
+      shape = { 'type' => 'object', 'properties' => { 'name' => { 'type' => 'string' } } }
+      decl = described_class.new(:get, '/articles')
+      decl.response 200, values: { 'oneOf' => [shape, { 'type' => 'string' }] }
+      decl.response 201, values: { 'anyOf' => [shape, { 'type' => 'integer' }] }
+      decl.response 202, values: { 'allOf' => [shape, { 'required' => ['name'] }] }
+      decl.close_responses!
+      expect(decl.json_schema(200)['additionalProperties']['oneOf']).to eq [shape.merge('additionalProperties' => false), { 'type' => 'string' }]
+      expect(decl.json_schema(201)['additionalProperties']['anyOf']).to eq [shape.merge('additionalProperties' => false), { 'type' => 'integer' }]
+      expect(decl.json_schema(202)['additionalProperties']['allOf']).to eq [shape, { 'required' => ['name'] }]
+      expect(shape).not_to have_key('additionalProperties')
+    end
+
     it 'passes a boolean schema in a hash handed in as it is' do
       decl = described_class.new(:get, '/articles')
       decl.response 200, values: { 'type' => 'object', 'properties' => { 'name' => true, 'tags' => { 'type' => 'array', 'items' => false } } }
