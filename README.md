@@ -36,11 +36,15 @@ class App < Sinatra::Base
   end
 
   post '/articles' do
+    article = JSON.parse(request.body.read)
     status 201
-    { id: 1, name: params['name'] }.to_json
+    { id: 1, name: article['name'] }.to_json
   end
 end
 ```
+
+Sinatra does not read a JSON body into `params`; the route parses it, and the body is still readable because the
+filter rewinds it after validating.
 
 A request with a misspelled key, `{"nmae": "First"}`, logs
 
@@ -148,10 +152,15 @@ endpoint :post, '/articles' do
   end
 
   response 422 do
-    string :error, required: true
+    array :errors, required: true do
+      string :field, required: true
+      string :error, required: true
+    end
   end
 end
 ```
+
+The `422` above is the shape the handler in [Strict Mode and Clients](#strict-mode-and-clients) sends.
 
 Two shorthands cover the edges. `response 200` with no block declares an object of any shape: the status is documented
 and the body is checked to be an object, nothing more. An endpoint with no `response` at all is documented as a
@@ -277,7 +286,9 @@ before do
 end
 ```
 
-`security` also accepts a raw OpenAPI security requirement array, for a scheme the symbols do not cover.
+`security` also accepts a raw OpenAPI security requirement array. Only `bearer` and `basic` get a definition in the
+generated document, so a custom scheme named there is a requirement without a definition until
+[#27](https://github.com/attribution/sinatra-exchange-schema/issues/27) lands.
 
 ### Data Types
 
@@ -413,13 +424,16 @@ A fourth setting, `additional_properties`, is a boolean rather than a mode — s
 - **Query** — against the `query` schema, as strings, with path parameters removed and undeclared keys allowed.
 - **Response body** — only a status the endpoint declared, against its JSON form; a `500`, or a `422` the endpoint
   never declared, passes unchecked. A status with no JSON form is never validated; one with several forms is
-  validated only when the `Content-Type` sent is `application/json`. An empty body passes.
+  validated only when the `Content-Type` sent is `application/json`. An empty body passes, and so does a body that
+  is not valid JSON, whatever its `Content-Type`
+  ([#28](https://github.com/attribution/sinatra-exchange-schema/issues/28)).
 - **Missing schema** — a routed request with no matching declaration. `OPTIONS` and `HEAD` are exempt.
 
 An array payload against an object-typed schema — a request body that is a JSON array, or a response that returns an
 array where an object was declared — is validated element by element instead of failing. This unwrap is scheduled
-for removal ([#17](https://github.com/attribution/sinatra-exchange-schema/issues/17)); declare a top-level array
-with `items:`.
+for removal ([#17](https://github.com/attribution/sinatra-exchange-schema/issues/17)). A response declares a
+top-level array with `items:`; a request body has no such form yet
+([#29](https://github.com/attribution/sinatra-exchange-schema/issues/29)).
 
 ### Undeclared Body Keys
 
@@ -532,6 +546,8 @@ end
 
 Each error is a hash with `field` (a JSON pointer), `error`, `type` and `actual_value`. The response error is raised
 in an after filter, once the route has run; it is a signal for tests and staging, not something a client should see.
+A response an `error` handler produces is never response-validated: Sinatra skips the after filters once a handler
+has answered a raise.
 
 ### Strict in Tests
 
@@ -636,6 +652,10 @@ The DSL covers the keywords above and no others. Not yet expressible:
 - Value constraints — `minimum`, `maximum`, `minLength`, `maxLength`, `pattern`, `default`
 - Header parameters
 - Query parameter coercion ([#15](https://github.com/attribution/sinatra-exchange-schema/issues/15))
+- A request body that is a top-level array or map
+  ([#29](https://github.com/attribution/sinatra-exchange-schema/issues/29))
+- A security scheme other than `bearer` and `basic`
+  ([#27](https://github.com/attribution/sinatra-exchange-schema/issues/27))
 
 A schema hash passed as `items:` or `values:` is emitted and validated as it is, so any JSON Schema keyword works
 there, without a DSL verb.
