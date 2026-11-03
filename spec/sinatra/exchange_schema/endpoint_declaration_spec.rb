@@ -180,13 +180,38 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
       expect(values['unevaluatedProperties']).to be false
       expect(values).not_to have_key('additionalProperties')
       expect(values['allOf'].first).not_to have_key('additionalProperties')
-      expect(values['allOf'].first['properties']['tags']['additionalProperties']).to be false
-      expect(part['properties']['tags']).not_to have_key('additionalProperties')
+      expect(values['allOf'].first['properties']['tags']).not_to have_key('additionalProperties')
 
       schemer = JSONSchemer.schema(values)
       expect(schemer.valid?({ 'id' => 1, 'name' => 'a', 'tags' => { 'label' => 'x' } })).to be true
       expect(schemer.valid?({ 'id' => 1, 'name' => 'a', 'extra' => true })).to be false
-      expect(schemer.valid?({ 'id' => 1, 'name' => 'a', 'tags' => { 'label' => 'x', 'extra' => true } })).to be false
+    end
+
+    it 'leaves what a composition describes beneath its top open, two parts may share a nested object' do
+      decl = described_class.new(:get, '/articles')
+      decl.response 200, values: {
+        'allOf' => [
+          { 'properties' => { 'meta' => { 'type' => 'object', 'properties' => { 'a' => { 'type' => 'integer' } } } } },
+          { 'properties' => { 'meta' => { 'type' => 'object', 'properties' => { 'b' => { 'type' => 'integer' } } } } }
+        ]
+      }
+      decl.close_responses!
+      values = decl.json_schema(200)['additionalProperties']
+
+      expect(values['unevaluatedProperties']).to be false
+      expect(values['allOf'].map { |part| part['properties']['meta'] }).to all(satisfy { |meta| !meta.key?('additionalProperties') })
+      expect(JSONSchemer.schema(values).valid?({ 'meta' => { 'a' => 1, 'b' => 2 } })).to be true
+      expect(JSONSchemer.schema(values).valid?({ 'meta' => { 'a' => 1 }, 'extra' => true })).to be false
+    end
+
+    it 'closes an object in a tuple position as it closes array items' do
+      decl = described_class.new(:get, '/articles')
+      decl.response 200, items: { 'type' => 'array', 'prefixItems' => [{ 'type' => 'object', 'properties' => { 'name' => { 'type' => 'string' } } }, { 'type' => 'integer' }] }
+      decl.close_responses!
+      tuple = decl.json_schema(200)['items']['prefixItems']
+
+      expect(tuple.first['additionalProperties']).to be false
+      expect(tuple.last).to eq('type' => 'integer')
     end
 
     it 'closes alternatives through their parent, so a key either side declares passes and no other' do
