@@ -170,17 +170,41 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
       expect(decl.json_schema(201)['additionalProperties']).to be false
     end
 
-    it 'closes each alternative of a oneOf or anyOf on its own and leaves an allOf member alone' do
-      shape = { 'type' => 'object', 'properties' => { 'name' => { 'type' => 'string' } } }
+    it 'closes an object that composes with unevaluatedProperties, the composed schemas open at their top' do
+      part = { 'properties' => { 'name' => { 'type' => 'string' }, 'tags' => { 'type' => 'object', 'properties' => { 'label' => { 'type' => 'string' } } } }, 'required' => ['name'] }
       decl = described_class.new(:get, '/articles')
-      decl.response 200, values: { 'oneOf' => [shape, { 'type' => 'string' }] }
-      decl.response 201, values: { 'anyOf' => [shape, { 'type' => 'integer' }] }
-      decl.response 202, values: { 'allOf' => [shape, { 'required' => ['name'] }] }
+      decl.response 200, values: { 'type' => 'object', 'properties' => { 'id' => { 'type' => 'integer' } }, 'allOf' => [part] }
       decl.close_responses!
-      expect(decl.json_schema(200)['additionalProperties']['oneOf']).to eq [shape.merge('additionalProperties' => false), { 'type' => 'string' }]
-      expect(decl.json_schema(201)['additionalProperties']['anyOf']).to eq [shape.merge('additionalProperties' => false), { 'type' => 'integer' }]
-      expect(decl.json_schema(202)['additionalProperties']['allOf']).to eq [shape, { 'required' => ['name'] }]
-      expect(shape).not_to have_key('additionalProperties')
+      values = decl.json_schema(200)['additionalProperties']
+
+      expect(values['unevaluatedProperties']).to be false
+      expect(values).not_to have_key('additionalProperties')
+      expect(values['allOf'].first).not_to have_key('additionalProperties')
+      expect(values['allOf'].first['properties']['tags']['additionalProperties']).to be false
+      expect(part['properties']['tags']).not_to have_key('additionalProperties')
+
+      schemer = JSONSchemer.schema(values)
+      expect(schemer.valid?({ 'id' => 1, 'name' => 'a', 'tags' => { 'label' => 'x' } })).to be true
+      expect(schemer.valid?({ 'id' => 1, 'name' => 'a', 'extra' => true })).to be false
+      expect(schemer.valid?({ 'id' => 1, 'name' => 'a', 'tags' => { 'label' => 'x', 'extra' => true } })).to be false
+    end
+
+    it 'closes alternatives through their parent, so a key either side declares passes and no other' do
+      alternatives = [{ 'type' => 'object', 'properties' => { 'name' => { 'type' => 'string' } }, 'required' => ['name'] }, { 'type' => 'string' }]
+      decl = described_class.new(:get, '/articles')
+      decl.response 200, items: { 'type' => %w[object string], 'properties' => { 'id' => { 'type' => 'integer' } }, 'oneOf' => alternatives }
+      decl.response 201, values: { 'anyOf' => alternatives }
+      decl.close_responses!
+      items = decl.json_schema(200)['items']
+
+      expect(items['unevaluatedProperties']).to be false
+      expect(items['oneOf']).to eq alternatives
+      expect(decl.json_schema(201)['additionalProperties']).to eq('anyOf' => alternatives, 'unevaluatedProperties' => false)
+
+      schemer = JSONSchemer.schema(items)
+      expect(schemer.valid?({ 'id' => 1, 'name' => 'a' })).to be true
+      expect(schemer.valid?('plain')).to be true
+      expect(schemer.valid?({ 'id' => 1, 'name' => 'a', 'extra' => true })).to be false
     end
 
     it 'passes a boolean schema in a hash handed in as it is' do

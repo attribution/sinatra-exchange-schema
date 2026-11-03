@@ -119,30 +119,37 @@ module Sinatra
         @body_schema = @body_schema.merge('additionalProperties' => false)
       end
 
+      COMPOSITIONS = %w[allOf oneOf anyOf].freeze
+
       # Closes every object a JSON form declares to the keys it names: nested objects, array items
       # and map values included, since a response's undeclared keys sit at any depth. An object
       # that names no property stays open, as in a body, a map keeps its values schema, and a
-      # boolean schema, which a hash handed in may carry, passes as it is. An alternative under
-      # +oneOf+ or +anyOf+ is a whole shape and closes on its own; an +allOf+ member is a part of
-      # one and stays, since closing it would reject the other members' keys. The forms are
+      # boolean schema, which a hash handed in may carry, passes as it is. An object that composes
+      # with +allOf+, +oneOf+ or +anyOf+ closes with +unevaluatedProperties+, which sees the keys
+      # the composed schemas declare where +additionalProperties+ would reject them; the composed
+      # schemas stay open at their top, their nested objects closing as any. The forms are
       # rebuilt, so a schema handed in as +values:+ or +items:+ is not edited.
       def close_responses!
         @json_schemas = @json_schemas.transform_values { |schema| closed(schema) }
       end
 
-      def closed(schema)
+      def closed(schema, composed_part: false)
         return schema unless schema.is_a?(Hash)
 
         closed = schema.dup
         properties = schema['properties']
-        if properties.is_a?(Hash) && !properties.empty?
-          closed['properties'] = properties.transform_values { |property| closed(property) }
-          closed['additionalProperties'] = false unless schema.key?('additionalProperties')
+        closed['properties'] = properties.transform_values { |property| closed(property) } if properties.is_a?(Hash)
+        COMPOSITIONS.each do |keyword|
+          closed[keyword] = schema[keyword].map { |part| closed(part, composed_part: true) } if schema[keyword].is_a?(Array)
         end
         closed['items'] = closed(schema['items']) if schema['items'].is_a?(Hash)
         closed['additionalProperties'] = closed(schema['additionalProperties']) if schema['additionalProperties'].is_a?(Hash)
-        %w[oneOf anyOf].each do |keyword|
-          closed[keyword] = schema[keyword].map { |alternative| closed(alternative) } if schema[keyword].is_a?(Array)
+        return closed if composed_part || schema.key?('additionalProperties') || schema.key?('unevaluatedProperties')
+
+        if COMPOSITIONS.any? { |keyword| schema[keyword].is_a?(Array) }
+          closed['unevaluatedProperties'] = false
+        elsif properties.is_a?(Hash) && !properties.empty?
+          closed['additionalProperties'] = false
         end
         closed
       end

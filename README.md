@@ -346,7 +346,9 @@ Sinatra::ExchangeSchema.response_additional_properties = false   # default: true
 
 The exceptions of a body hold: an object that declares no properties stays open, since there is
 nothing to close against, and a map, or an object with `values`, keeps the values schema it declared.
-Forms under another media type are untouched. With `response_validation` on `:warn` a closed response
+A schema hash handed in that composes with `allOf`, `oneOf` or `anyOf` closes with
+`unevaluatedProperties: false`, which counts the keys the composed schemas declare where
+`additionalProperties` would reject them. Forms under another media type are untouched. With `response_validation` on `:warn` a closed response
 reports the keys it never declared without failing anyone, the way to find a key a serializer gained
 before `:strict` refuses it.
 
