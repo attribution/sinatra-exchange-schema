@@ -331,6 +331,36 @@ endpoint :post, '/webhook' do
 end
 ```
 
+### Undeclared Response Keys
+
+A response object is open the same way: one that declares `id` and `name` passes a payload that also
+carries `password_hash`, so the schema cannot promise a reader that the keys it lists are all there
+are. `response_additional_properties` closes every object a JSON response declares, nested objects,
+array items and map values included, as `additionalProperties: false` in the schema the validator
+checks and in the generated OpenAPI. It defaults to `true`, open, so an app turns it off where its
+declarations are complete:
+
+```ruby
+Sinatra::ExchangeSchema.response_additional_properties = false   # default: true
+```
+
+The exceptions of a body hold: an object that declares no properties stays open, since there is
+nothing to close against, and a map, or an object with `values`, keeps the values schema it declared.
+Forms under another media type are untouched. With `response_validation` on `:warn` a closed response
+reports the keys it never declared without failing anyone, the way to find a key a serializer gained
+before `:strict` refuses it.
+
+An endpoint whose response is open by design opts out for itself:
+
+```ruby
+endpoint :get, '/settings' do
+  response_additional_properties true
+  response 200 do
+    string :theme
+  end
+end
+```
+
 ### Configuration Levels
 
 Settings are resolved with **endpoint > controller > app-wide** precedence.
@@ -342,6 +372,7 @@ Sinatra::ExchangeSchema.request_validation    = :strict
 Sinatra::ExchangeSchema.response_validation   = :off
 Sinatra::ExchangeSchema.missing_schema        = :warn
 Sinatra::ExchangeSchema.additional_properties = true
+Sinatra::ExchangeSchema.response_additional_properties = false
 ```
 
 **Per-controller** — overrides the app-wide default for a single Sinatra class:
@@ -351,6 +382,7 @@ class Api < Sinatra::Base
   register Sinatra::ExchangeSchema
   set :request_validation, :strict
   set :additional_properties, true
+  set :response_additional_properties, false
 end
 ```
 
@@ -361,6 +393,7 @@ endpoint :post, '/articles' do
   request_validation :strict
   response_validation :off
   additional_properties true
+  response_additional_properties false
   body do
     string :name, required: true
   end
@@ -369,9 +402,9 @@ end
 
 Leaving a level unset means "inherit"; an explicit value at a lower level wins over the one
 above it, including `additional_properties true` under an app-wide `false`. `missing_schema` has no per-endpoint level — it fires precisely when no
-declaration matched. `additional_properties` is read once, when the endpoint is declared, so
-`set :additional_properties` must appear above the `endpoint` blocks it should affect (the
-same ordering `endpoint_security` already requires).
+declaration matched. `additional_properties` and `response_additional_properties` are read once,
+when the endpoint is declared, so `set :additional_properties` must appear above the `endpoint`
+blocks it should affect (the same ordering `endpoint_security` already requires).
 
 ### Strict in Tests
 

@@ -52,6 +52,12 @@ module Sinatra
         @additional_properties = value
       end
 
+      def response_additional_properties(value = :_unset)
+        return @response_additional_properties if value == :_unset
+
+        @response_additional_properties = value
+      end
+
       def openapi_file(value = :_unset)
         return @openapi_file if value == :_unset
 
@@ -112,6 +118,26 @@ module Sinatra
 
         @body_schema = @body_schema.merge('additionalProperties' => false)
       end
+
+      # Closes every object a JSON form declares to the keys it names: nested objects, array items
+      # and map values included, since a response's undeclared keys sit at any depth. An object
+      # without properties stays open, as in a body, and a map keeps its values schema. The forms
+      # are rebuilt, so a schema handed in as +values:+ or +items:+ is not edited.
+      def close_responses!
+        @json_schemas = @json_schemas.transform_values { |schema| closed(schema) }
+      end
+
+      def closed(schema)
+        closed = schema.dup
+        if schema['properties'].is_a?(Hash)
+          closed['properties'] = schema['properties'].transform_values { |property| closed(property) }
+          closed['additionalProperties'] = false unless schema.key?('additionalProperties')
+        end
+        closed['items'] = closed(schema['items']) if schema['items'].is_a?(Hash)
+        closed['additionalProperties'] = closed(schema['additionalProperties']) if schema['additionalProperties'].is_a?(Hash)
+        closed
+      end
+      private :closed
 
       # Define a JSON Schema for query-string parameters.
       # The block is evaluated in the context of a ExchangeSchema::Builder.
