@@ -134,6 +134,20 @@ describe Sinatra::ExchangeSchema::Builder do
     end
   end
 
+  describe 'required once' do
+    it 'requires a field once however often it is declared, whatever its kinds' do
+      builder.string :trait, required: true
+      builder.any :trait, required: true
+      builder.object(:meta, required: true) { string :source }
+      builder.object(:meta, required: true) { string :source }
+      builder.array :tags, required: true, items: :string
+      builder.array :tags, required: true, items: :string
+      builder.map :totals, required: true, values: :integer
+      builder.map :totals, required: true, values: :integer
+      expect(builder.to_json_schema['required']).to eq %w[trait meta tags totals]
+    end
+  end
+
   describe 'description' do
     it 'includes description on a scalar field' do
       builder.string :name, description: 'Full name of the user'
@@ -195,6 +209,21 @@ describe Sinatra::ExchangeSchema::Builder do
     end
   end
 
+  describe 'any' do
+    it 'declares every JSON type' do
+      builder.any :trait, description: 'As the client sent it'
+      expect(builder.to_json_schema['properties']['trait']).to eq(
+        'type' => %w[string integer number boolean object array null],
+        'description' => 'As the client sent it'
+      )
+    end
+
+    it 'tracks required' do
+      builder.any :trait, required: true
+      expect(builder.to_json_schema['required']).to eq ['trait']
+    end
+  end
+
   describe 'map' do
     it 'compiles scalar values from a symbol' do
       builder.map :totals, values: :integer
@@ -239,6 +268,51 @@ describe Sinatra::ExchangeSchema::Builder do
 
     it 'refuses a map without values' do
       expect { builder.map :totals }.to raise_error(ArgumentError, /needs values: or a block/)
+    end
+  end
+
+  describe 'values' do
+    it 'declares what every key not named takes, beside the named ones' do
+      builder.object :total do
+        integer :views
+      end
+      builder.values do
+        integer :views
+        integer :change
+      end
+
+      expect(schema['properties'].keys).to eq(['total'])
+      expect(schema['additionalProperties']['properties'].keys).to eq(%w[views change])
+    end
+
+    it 'takes a type' do
+      builder.values :integer
+      expect(schema['additionalProperties']).to eq('type' => 'integer')
+    end
+
+    it 'takes a schema hash' do
+      builder.values('type' => 'array', 'items' => { 'type' => 'string' })
+      expect(schema['additionalProperties']).to eq('type' => 'array', 'items' => { 'type' => 'string' })
+    end
+
+    it 'works inside a map\'s value object' do
+      builder.map :by_article do
+        object(:total) { integer :views }
+        values { integer :views }
+      end
+
+      value = schema['properties']['by_article']['additionalProperties']
+      expect(value['properties'].keys).to eq(['total'])
+      expect(value['additionalProperties']['properties'].keys).to eq(['views'])
+    end
+
+    it 'refuses values without a type, a schema or a block' do
+      expect { builder.values }.to raise_error(ArgumentError, /needs a type/)
+    end
+
+    it 'is left out when never declared' do
+      builder.string :name
+      expect(schema).not_to have_key('additionalProperties')
     end
   end
 end

@@ -310,6 +310,8 @@ The `body`, `query`, `path`, and `response` blocks use a builder DSL with these 
 | `array`   | `required:`, `nullable:`, `items:`, `description:`, block |
 | `object`  | `required:`, `nullable:`, `description:`, block (optional) |
 | `map`     | `required:`, `nullable:`, `values:`, `description:`, block |
+| `values`  | a type, a schema hash, or a block: what every key not named in the block takes |
+| `any`     | `required:`, `description:` — any JSON value, as the full type list |
 
 `format:` takes a JSON Schema format name (`date`, `date-time`, `email`, `uri`, …). json_schemer validates it under the
 gem's default options, so `string :start_date, format: :date` rejects `2026-13-01` at request time, and the OpenAPI
@@ -345,8 +347,37 @@ A response body that validates against it:
 }
 ```
 
+An object with some named keys and any number of others takes `values` inside its block: the named keys keep their own
+schemas, every other key takes the one `values` declares. A map's value object can carry it too.
+
+```ruby
+map :by_article, description: 'Keyed by article id' do
+  object :total, description: 'All periods added up' do
+    integer :views
+  end
+  values do # any other key is a period id
+    integer :views
+    integer :change, description: 'Views against the period before'
+  end
+end
+```
+
+A value that validates against it, under any article id:
+
+```json
+{
+  "total": { "views": 300 },
+  "2026-01": { "views": 120, "change": 20 },
+  "2026-02": { "views": 180, "change": 60 }
+}
+```
+
+`any` declares a field that takes any JSON value — a free-form attribute stored as the client sent it — as the full
+type list, `string`, `integer`, `number`, `boolean`, `object`, `array` and `null`, so the validator accepts whatever
+arrives and the generated spec shows a declared type rather than an open schema.
+
 A property that takes more than one scalar type is declared once per type under the same name; the types merge into a
-union:
+union, and the property is required once however many of its declarations say so:
 
 ```ruby
 body do
@@ -402,6 +433,8 @@ it back on:
 ```ruby
 Sinatra::ExchangeSchema.additional_properties = true   # default: false
 ```
+
+A body that declares `values` has said what its other keys take, and keeps that whatever the setting.
 
 This is orthogonal to the modes above: `additional_properties` decides what counts as a
 violation, `request_validation` decides what happens to one. Leaving it closed while

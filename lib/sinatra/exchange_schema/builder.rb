@@ -4,6 +4,8 @@
 # Scalar types: string, integer, number, boolean
 # Compound types: array (with +items+ block, symbol, or hash), object (with nested block),
 # map (an object keyed by data, with +values+ symbol or hash, or a nested block)
+# Inside any block, +values+ declares what every key not named there takes.
+# +any+ declares a field that takes any JSON value, as the full type list.
 #
 # == Usage
 #
@@ -30,12 +32,14 @@ module Sinatra
   module ExchangeSchema
     class Builder
       TYPES = %w[string integer number boolean].freeze
+      JSON_TYPES = %w[string integer number boolean object array null].freeze
 
       attr_reader :properties, :required_fields
 
       def initialize
         @properties = {}
         @required_fields = []
+        @values = nil
       end
 
       TYPES.each do |type|
@@ -49,8 +53,18 @@ module Sinatra
           prop['format'] = opts[:format].to_s if opts[:format]
           prop['description'] = opts[:description] if opts[:description]
           @properties[name] = prop
-          @required_fields << name if opts[:required] && !@required_fields.include?(name)
+          require_field(name) if opts[:required]
         end
+      end
+
+      # A field that takes any JSON value, declared as the full type list so the validator and
+      # the generated spec both see a declared type, not an open schema.
+      def any(name, required: false, description: nil)
+        name = name.to_s
+        prop = { 'type' => JSON_TYPES.dup }
+        prop['description'] = description if description
+        @properties[name] = prop
+        require_field(name) if required
       end
 
       def array(name, items: nil, required: false, nullable: false, description: nil, &block)
@@ -65,7 +79,7 @@ module Sinatra
         end
         prop['description'] = description if description
         @properties[name] = prop
-        @required_fields << name if required
+        require_field(name) if required
       end
 
       def object(name, required: false, nullable: false, description: nil, &block)
@@ -81,7 +95,7 @@ module Sinatra
           prop['description'] = description if description
           @properties[name] = prop
         end
-        @required_fields << name if required
+        require_field(name) if required
       end
 
       # An object whose keys are data (ids, dates, names) and whose values share one schema: a
@@ -101,7 +115,22 @@ module Sinatra
         end
         prop['description'] = description if description
         @properties[name] = prop
-        @required_fields << name if required
+        require_field(name) if required
+      end
+
+      # What every key not named in this block takes: a symbol names a scalar type, a hash is used as
+      # the schema, a block builds the value object. Emitted as +additionalProperties+ beside the
+      # named properties, for an object with some fixed keys and any number of others.
+      def values(type = nil, &block)
+        @values = if block
+          nested = self.class.new
+          nested.instance_eval(&block)
+          nested.to_json_schema
+        elsif type
+          type.is_a?(Symbol) ? { 'type' => type.to_s } : type
+        else
+          raise ArgumentError, 'values needs a type, a schema or a block'
+        end
       end
 
       def to_json_schema
@@ -110,7 +139,15 @@ module Sinatra
           'properties' => @properties
         }
         schema['required'] = @required_fields unless @required_fields.empty?
+        schema['additionalProperties'] = @values if @values
         schema
+      end
+
+      private
+
+      # A field is required once, however many times it is declared.
+      def require_field(name)
+        @required_fields << name unless @required_fields.include?(name)
       end
     end
   end

@@ -267,6 +267,18 @@ describe Sinatra::ExchangeSchema do
         { id: '1' }.to_json
       end
 
+      endpoint :post, '/test_values_body' do
+        summary 'A body with a named key and any number of counted ones'
+        body do
+          string :name, required: true
+          values :integer
+        end
+      end
+
+      post '/test_values_body' do
+        [200, {}, 'ok']
+      end
+
       get '/no_schema' do
         'ok'
       end
@@ -359,6 +371,19 @@ describe Sinatra::ExchangeSchema do
           get '/test', status: 'unknown'
         end.to raise_error(Sinatra::ExchangeSchema::RequestValidator::SchemaValidationError,
                            /schema validation failed/i)
+      end
+    end
+
+    context 'with a body that declares values' do
+      it 'accepts the keys it did not name when they fit' do
+        post '/test_values_body', { name: 'hello', '17' => 3, '42' => 9 }.to_json, 'CONTENT_TYPE' => 'application/json'
+        expect(last_response.status).to eq(200)
+      end
+
+      it 'refuses one that does not fit' do
+        expect do
+          post '/test_values_body', { name: 'hello', '17' => 'three' }.to_json, 'CONTENT_TYPE' => 'application/json'
+        end.to raise_error(Sinatra::ExchangeSchema::RequestValidator::SchemaValidationError, /17/)
       end
     end
 
