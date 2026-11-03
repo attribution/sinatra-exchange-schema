@@ -123,8 +123,9 @@ module Sinatra
 
       # Closes every object a JSON form declares to the keys it names: nested objects, array items
       # and map values included, since a response's undeclared keys sit at any depth. An object
-      # that names no property stays open, as in a body, a map keeps its values schema, and a
-      # boolean schema, which a hash handed in may carry, passes as it is. An object that composes
+      # that names no property, itself or through what it composes, stays open, as in a body; a
+      # map keeps its values schema, and a boolean schema, which a hash handed in may carry, passes
+      # as it is. An object that composes
       # with +allOf+, +oneOf+ or +anyOf+ closes with +unevaluatedProperties+, which sees the keys
       # the composed schemas declare where +additionalProperties+ would reject them; the composed
       # schemas stay open at their top, their nested objects closing as any. The forms are
@@ -145,15 +146,24 @@ module Sinatra
         closed['items'] = closed(schema['items']) if schema['items'].is_a?(Hash)
         closed['additionalProperties'] = closed(schema['additionalProperties']) if schema['additionalProperties'].is_a?(Hash)
         return closed if composed_part || schema.key?('additionalProperties') || schema.key?('unevaluatedProperties')
+        return closed unless names_property?(schema)
 
-        if COMPOSITIONS.any? { |keyword| schema[keyword].is_a?(Array) }
-          closed['unevaluatedProperties'] = false
-        elsif properties.is_a?(Hash) && !properties.empty?
-          closed['additionalProperties'] = false
-        end
+        closed[composed?(schema) ? 'unevaluatedProperties' : 'additionalProperties'] = false
         closed
       end
-      private :closed
+
+      def composed?(schema)
+        COMPOSITIONS.any? { |keyword| schema[keyword].is_a?(Array) }
+      end
+
+      # Whether the schema names a property itself or through a schema it composes, at any depth.
+      def names_property?(schema)
+        return false unless schema.is_a?(Hash)
+        return true if schema['properties'].is_a?(Hash) && !schema['properties'].empty?
+
+        COMPOSITIONS.any? { |keyword| schema[keyword].is_a?(Array) && schema[keyword].any? { |part| names_property?(part) } }
+      end
+      private :closed, :composed?, :names_property?
 
       # Define a JSON Schema for query-string parameters.
       # The block is evaluated in the context of a ExchangeSchema::Builder.

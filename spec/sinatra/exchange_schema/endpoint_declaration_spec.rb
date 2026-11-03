@@ -207,6 +207,16 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
       expect(schemer.valid?({ 'id' => 1, 'name' => 'a', 'extra' => true })).to be false
     end
 
+    it 'leaves a composition that names no property open' do
+      decl = described_class.new(:get, '/articles')
+      decl.response 200, values: { 'allOf' => [{ 'type' => 'object' }] }
+      decl.response 201, items: { 'oneOf' => [{ 'type' => 'string' }, { 'type' => 'integer' }] }
+      decl.close_responses!
+      expect(decl.json_schema(200)['additionalProperties']).to eq('allOf' => [{ 'type' => 'object' }])
+      expect(decl.json_schema(201)['items']).to eq('oneOf' => [{ 'type' => 'string' }, { 'type' => 'integer' }])
+      expect(JSONSchemer.schema(decl.json_schema(200)['additionalProperties']).valid?({ 'theme' => 'dark' })).to be true
+    end
+
     it 'passes a boolean schema in a hash handed in as it is' do
       decl = described_class.new(:get, '/articles')
       decl.response 200, values: { 'type' => 'object', 'properties' => { 'name' => true, 'tags' => { 'type' => 'array', 'items' => false } } }
