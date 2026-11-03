@@ -135,29 +135,25 @@ module Sinatra
         @json_schemas = @json_schemas.transform_values { |schema| closed(schema) }
       end
 
-      # +open+ is set beneath a composition: the walk still rebuilds, so nothing is edited, but
-      # closes nothing there.
+      # +open+ is set beneath a composition, the schema's own or an outer one: the walk still
+      # rebuilds, so nothing is edited, but closes nothing there, a composition inside one included.
       def closed(schema, open: false)
         return schema unless schema.is_a?(Hash)
 
-        open ||= composed?(schema)
+        beneath = open || composed?(schema)
         closed = schema.dup
         properties = schema['properties']
-        closed['properties'] = properties.transform_values { |property| closed(property, open: open) } if properties.is_a?(Hash)
+        closed['properties'] = properties.transform_values { |property| closed(property, open: beneath) } if properties.is_a?(Hash)
         COMPOSITIONS.each do |keyword|
-          closed[keyword] = schema[keyword].map { |part| closed(part, open: open) } if schema[keyword].is_a?(Array)
+          closed[keyword] = schema[keyword].map { |part| closed(part, open: beneath) } if schema[keyword].is_a?(Array)
         end
-        closed['items'] = closed(schema['items'], open: open) if schema['items'].is_a?(Hash)
-        closed['prefixItems'] = schema['prefixItems'].map { |item| closed(item, open: open) } if schema['prefixItems'].is_a?(Array)
-        closed['additionalProperties'] = closed(schema['additionalProperties'], open: open) if schema['additionalProperties'].is_a?(Hash)
-        return closed if schema.key?('additionalProperties') || schema.key?('unevaluatedProperties')
+        closed['items'] = closed(schema['items'], open: beneath) if schema['items'].is_a?(Hash)
+        closed['prefixItems'] = schema['prefixItems'].map { |item| closed(item, open: beneath) } if schema['prefixItems'].is_a?(Array)
+        closed['additionalProperties'] = closed(schema['additionalProperties'], open: beneath) if schema['additionalProperties'].is_a?(Hash)
+        return closed if open || schema.key?('additionalProperties') || schema.key?('unevaluatedProperties')
         return closed unless names_property?(schema)
 
-        if composed?(schema)
-          closed['unevaluatedProperties'] = false
-        elsif !open
-          closed['additionalProperties'] = false
-        end
+        closed[composed?(schema) ? 'unevaluatedProperties' : 'additionalProperties'] = false
         closed
       end
 

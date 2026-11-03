@@ -204,6 +204,19 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
       expect(JSONSchemer.schema(values).valid?({ 'meta' => { 'a' => 1 }, 'extra' => true })).to be false
     end
 
+    it 'leaves a composition inside a composition open, the outer top the one check' do
+      inner = { 'allOf' => [{ 'properties' => { 'name' => { 'type' => 'string' } }, 'required' => ['name'] }] }
+      decl = described_class.new(:get, '/articles')
+      decl.response 200, values: { 'type' => 'object', 'properties' => { 'id' => { 'type' => 'integer' } }, 'allOf' => [inner] }
+      decl.close_responses!
+      values = decl.json_schema(200)['additionalProperties']
+
+      expect(values['unevaluatedProperties']).to be false
+      expect(values['allOf'].first).to eq inner
+      expect(JSONSchemer.schema(values).valid?({ 'id' => 1, 'name' => 'a' })).to be true
+      expect(JSONSchemer.schema(values).valid?({ 'id' => 1, 'name' => 'a', 'extra' => true })).to be false
+    end
+
     it 'closes an object in a tuple position as it closes array items' do
       decl = described_class.new(:get, '/articles')
       decl.response 200, items: { 'type' => 'array', 'prefixItems' => [{ 'type' => 'object', 'properties' => { 'name' => { 'type' => 'string' } } }, { 'type' => 'integer' }] }
