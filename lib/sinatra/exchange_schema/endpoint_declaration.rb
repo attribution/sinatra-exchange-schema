@@ -120,10 +120,12 @@ module Sinatra
         @body_schema = @body_schema.merge('additionalProperties' => false)
       end
 
-      # Where a schema holds further schemas, by the shape it holds them in.
+      # Where a schema holds the schemas of what it contains or applies, by the shape it holds
+      # them in. +contains+, +not+, +propertyNames+ and +$defs+ stay out: they assert or are
+      # referred to, and closing one would change what it matches.
       SCHEMA_MAPS    = %w[properties patternProperties dependentSchemas].freeze
       SCHEMA_LISTS   = %w[allOf oneOf anyOf prefixItems].freeze
-      SINGLE_SCHEMAS = %w[items additionalProperties if then else].freeze
+      SINGLE_SCHEMAS = %w[items additionalProperties unevaluatedProperties unevaluatedItems if then else].freeze
       # The ones among them that apply to the object itself, which then composes.
       IN_PLACE = %w[allOf oneOf anyOf if then else dependentSchemas].freeze
 

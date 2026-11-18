@@ -271,6 +271,20 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
       expect(decl.json_schema(202)['additionalProperties']).to eq('$ref' => '#/$defs/row')
     end
 
+    it 'closes what unevaluatedProperties and unevaluatedItems declare, an assertion left as written' do
+      row = { 'type' => 'object', 'properties' => { 'name' => { 'type' => 'string' } } }
+      decl = described_class.new(:get, '/articles')
+      decl.response 200, values: { 'type' => 'object', 'unevaluatedProperties' => row }
+      decl.response 201, items: { 'type' => 'array', 'unevaluatedItems' => row, 'contains' => row }
+      decl.close_responses!
+      items = decl.json_schema(201)['items']
+
+      expect(decl.json_schema(200)['additionalProperties']['unevaluatedProperties']).to eq row.merge('additionalProperties' => false)
+      expect(items['unevaluatedItems']).to eq row.merge('additionalProperties' => false)
+      expect(items['contains']).to eq row
+      expect(row).not_to have_key('additionalProperties')
+    end
+
     it 'closes an object in a tuple position as it closes array items' do
       decl = described_class.new(:get, '/articles')
       decl.response 200, items: { 'type' => 'array', 'prefixItems' => [{ 'type' => 'object', 'properties' => { 'name' => { 'type' => 'string' } } }, { 'type' => 'integer' }] }
