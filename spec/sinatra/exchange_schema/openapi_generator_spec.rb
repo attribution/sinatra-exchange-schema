@@ -9,6 +9,24 @@ describe Sinatra::ExchangeSchema::OpenapiGenerator do
   end
 
   describe '.call' do
+    it 'emits a closed response as the declaration holds it' do
+      decl = build_declaration(:get, '/items') do
+        response 200 do
+          string :name
+          object :meta do
+            string :source
+          end
+        end
+      end
+      decl.close_responses!
+
+      doc = described_class.call([decl])
+      schema = doc['paths']['/items']['get']['responses']['200']['content']['application/json']['schema']
+
+      expect(schema['additionalProperties']).to be false
+      expect(schema['properties']['meta']['additionalProperties']).to be false
+    end
+
     it 'returns top-level OpenAPI keys' do
       doc = described_class.call([], info: { title: 'Test', version: '1.0', description: 'desc' })
 

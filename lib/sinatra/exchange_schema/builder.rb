@@ -33,6 +33,8 @@ module Sinatra
     class Builder
       TYPES = %w[string integer number boolean].freeze
       JSON_TYPES = %w[string integer number boolean object array null].freeze
+      # The JSON Schema keywords the builder writes; a schema that carries another was written by hand.
+      KEYWORDS = %w[type properties required items additionalProperties description enum format].freeze
 
       attr_reader :properties, :required_fields
 
