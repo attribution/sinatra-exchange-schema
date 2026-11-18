@@ -217,6 +217,60 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
       expect(JSONSchemer.schema(values).valid?({ 'id' => 1, 'name' => 'a', 'extra' => true })).to be false
     end
 
+    it 'closes an object with a conditional through unevaluatedProperties, the branches counted' do
+      decl = described_class.new(:get, '/articles')
+      decl.response 200, values: {
+        'type' => 'object',
+        'properties' => { 'kind' => { 'type' => 'string' } },
+        'if' => { 'properties' => { 'kind' => { 'const' => 'video' } } },
+        'then' => { 'properties' => { 'length' => { 'type' => 'integer' } }, 'required' => ['length'] }
+      }
+      decl.close_responses!
+      values = decl.json_schema(200)['additionalProperties']
+
+      expect(values['unevaluatedProperties']).to be false
+      expect(values).not_to have_key('additionalProperties')
+      expect(values['then']).not_to have_key('additionalProperties')
+
+      schemer = JSONSchemer.schema(values)
+      expect(schemer.valid?({ 'kind' => 'video', 'length' => 90 })).to be true
+      expect(schemer.valid?({ 'kind' => 'text' })).to be true
+      expect(schemer.valid?({ 'kind' => 'video', 'length' => 90, 'extra' => true })).to be false
+    end
+
+    it 'closes the values pattern properties take, the object that names no property left open' do
+      decl = described_class.new(:get, '/articles')
+      decl.response 200, values: {
+        'type' => 'object',
+        'patternProperties' => { '^p\\d+$' => { 'type' => 'object', 'properties' => { 'views' => { 'type' => 'integer' } } } }
+      }
+      decl.close_responses!
+      values = decl.json_schema(200)['additionalProperties']
+
+      expect(values['patternProperties'].values.first['additionalProperties']).to be false
+      expect(values).not_to have_key('additionalProperties')
+    end
+
+    it 'takes dependent schemas and a reference as composing' do
+      decl = described_class.new(:get, '/articles')
+      decl.response 200, values: {
+        'type' => 'object',
+        'properties' => { 'card' => { 'type' => 'string' } },
+        'dependentSchemas' => { 'card' => { 'properties' => { 'billing' => { 'type' => 'string' } } } }
+      }
+      decl.response 201, values: { 'properties' => { 'id' => { 'type' => 'integer' } }, '$ref' => '#/$defs/row' }
+      decl.response 202, values: { '$ref' => '#/$defs/row' }
+      decl.close_responses!
+
+      dependent = decl.json_schema(200)['additionalProperties']
+      expect(dependent['unevaluatedProperties']).to be false
+      expect(JSONSchemer.schema(dependent).valid?({ 'card' => 'x', 'billing' => 'y' })).to be true
+      expect(JSONSchemer.schema(dependent).valid?({ 'card' => 'x', 'extra' => 1 })).to be false
+      expect(decl.json_schema(201)['additionalProperties']['unevaluatedProperties']).to be false
+      expect(decl.json_schema(201)['additionalProperties']).not_to have_key('additionalProperties')
+      expect(decl.json_schema(202)['additionalProperties']).to eq('$ref' => '#/$defs/row')
+    end
+
     it 'closes an object in a tuple position as it closes array items' do
       decl = described_class.new(:get, '/articles')
       decl.response 200, items: { 'type' => 'array', 'prefixItems' => [{ 'type' => 'object', 'properties' => { 'name' => { 'type' => 'string' } } }, { 'type' => 'integer' }] }

@@ -120,18 +120,23 @@ module Sinatra
         @body_schema = @body_schema.merge('additionalProperties' => false)
       end
 
-      COMPOSITIONS = %w[allOf oneOf anyOf].freeze
+      # Where a schema holds further schemas, by the shape it holds them in.
+      SCHEMA_MAPS    = %w[properties patternProperties dependentSchemas].freeze
+      SCHEMA_LISTS   = %w[allOf oneOf anyOf prefixItems].freeze
+      SINGLE_SCHEMAS = %w[items additionalProperties if then else].freeze
+      # The ones among them that apply to the object itself, which then composes.
+      IN_PLACE = %w[allOf oneOf anyOf if then else dependentSchemas].freeze
 
       # Closes every object a JSON form declares to the keys it names: nested objects, array items
       # and map values included, since a response's undeclared keys sit at any depth. An object
       # that names no property, itself or through what it composes, stays open, as in a body; a
       # map keeps its values schema, and a boolean schema, which a hash handed in may carry, passes
-      # as it is. An object that composes
-      # with +allOf+, +oneOf+ or +anyOf+ closes at its top alone, with +unevaluatedProperties+,
-      # which sees the keys the composed schemas declare where +additionalProperties+ would reject
-      # them; beneath it nothing closes, since two composed schemas may describe one nested object
-      # between them. The forms are rebuilt, so a schema handed in as +values:+ or +items:+ is not
-      # edited.
+      # as it is. An object that composes, applying further schemas to itself by +allOf+, +oneOf+,
+      # +anyOf+, +if+ and its branches, +dependentSchemas+ or a +$ref+, closes at its top alone,
+      # with +unevaluatedProperties+, which sees the keys those schemas declare where
+      # +additionalProperties+ would reject them; beneath it nothing closes, since two of them may
+      # describe one nested object between them. The forms are rebuilt, so a schema handed in as
+      # +values:+ or +items:+ is not edited.
       def close_responses!
         @json_schemas = @json_schemas.transform_values { |schema| closed(schema) }
       end
@@ -143,14 +148,15 @@ module Sinatra
 
         beneath = open || composed?(schema)
         closed = schema.dup
-        properties = schema['properties']
-        closed['properties'] = properties.transform_values { |property| closed(property, open: beneath) } if properties.is_a?(Hash)
-        COMPOSITIONS.each do |keyword|
+        SCHEMA_MAPS.each do |keyword|
+          closed[keyword] = schema[keyword].transform_values { |part| closed(part, open: beneath) } if schema[keyword].is_a?(Hash)
+        end
+        SCHEMA_LISTS.each do |keyword|
           closed[keyword] = schema[keyword].map { |part| closed(part, open: beneath) } if schema[keyword].is_a?(Array)
         end
-        closed['items'] = closed(schema['items'], open: beneath) if schema['items'].is_a?(Hash)
-        closed['prefixItems'] = schema['prefixItems'].map { |item| closed(item, open: beneath) } if schema['prefixItems'].is_a?(Array)
-        closed['additionalProperties'] = closed(schema['additionalProperties'], open: beneath) if schema['additionalProperties'].is_a?(Hash)
+        SINGLE_SCHEMAS.each do |keyword|
+          closed[keyword] = closed(schema[keyword], open: beneath) if schema[keyword].is_a?(Hash)
+        end
         return closed if open || schema.key?('additionalProperties') || schema.key?('unevaluatedProperties')
         return closed unless names_property?(schema)
 
@@ -158,18 +164,30 @@ module Sinatra
         closed
       end
 
-      def composed?(schema)
-        COMPOSITIONS.any? { |keyword| schema[keyword].is_a?(Array) }
+      # The schemas an object applies to itself.
+      def applied(schema)
+        IN_PLACE.flat_map do |keyword|
+          case (held = schema[keyword])
+          when Array then held
+          when Hash then keyword == 'dependentSchemas' ? held.values : [held]
+          else []
+          end
+        end
       end
 
-      # Whether the schema names a property itself or through a schema it composes, at any depth.
+      # A reference applies a schema the walk cannot read, so it composes too.
+      def composed?(schema)
+        schema.key?('$ref') || applied(schema).any?
+      end
+
+      # Whether the schema names a property itself or through a schema it applies, at any depth.
       def names_property?(schema)
         return false unless schema.is_a?(Hash)
         return true if schema['properties'].is_a?(Hash) && !schema['properties'].empty?
 
-        COMPOSITIONS.any? { |keyword| schema[keyword].is_a?(Array) && schema[keyword].any? { |part| names_property?(part) } }
+        applied(schema).any? { |part| names_property?(part) }
       end
-      private :closed, :composed?, :names_property?
+      private :closed, :applied, :composed?, :names_property?
 
       # Define a JSON Schema for query-string parameters.
       # The block is evaluated in the context of a ExchangeSchema::Builder.
