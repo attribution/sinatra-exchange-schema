@@ -120,24 +120,19 @@ module Sinatra
         @body_schema = @body_schema.merge('additionalProperties' => false)
       end
 
-      # The keywords that apply further schemas to the object itself. +additionalProperties+ cannot
-      # see the keys those schemas declare, so an object that carries one is left as written.
-      IN_PLACE = %w[allOf oneOf anyOf if then else dependentSchemas $ref].freeze
-
       # Closes every object a JSON form declares to the keys it names: nested objects, array items
       # and map values included, since a response's undeclared keys sit at any depth. An object
-      # that names no property stays open, as in a body, and one that already says what its other
-      # keys take keeps that, a map among them. The walk closes what the builder emits: in a schema
-      # hash handed in, an object that composes or refers is left as written with all beneath it,
-      # and a boolean schema passes. The forms are rebuilt, so a schema handed in as +values:+ or
-      # +items:+ is not edited.
+      # that names no property stays open, as in a body, and a map keeps its values schema. The
+      # walk reads the builder's own keywords and no other: a schema that carries another, which
+      # only a hash handed in can, is left as written with everything beneath it, since that
+      # keyword may declare keys or schemas the walk would not see. The forms are rebuilt, so a
+      # schema handed in as +values:+ or +items:+ is not edited.
       def close_responses!
         @json_schemas = @json_schemas.transform_values { |schema| closed(schema) }
       end
 
       def closed(schema)
-        return schema unless schema.is_a?(Hash)
-        return schema if IN_PLACE.any? { |keyword| schema.key?(keyword) }
+        return schema unless schema.is_a?(Hash) && (schema.keys - Builder::KEYWORDS).empty?
 
         closed = schema.dup
         properties = schema['properties']
@@ -146,8 +141,7 @@ module Sinatra
         closed['additionalProperties'] = closed(schema['additionalProperties']) if schema['additionalProperties'].is_a?(Hash)
 
         named = properties.is_a?(Hash) && !properties.empty?
-        settled = schema.key?('additionalProperties') || schema.key?('unevaluatedProperties')
-        closed['additionalProperties'] = false if named && !settled
+        closed['additionalProperties'] = false if named && !schema.key?('additionalProperties')
         closed
       end
       private :closed

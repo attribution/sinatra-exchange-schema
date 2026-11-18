@@ -494,10 +494,11 @@ Sinatra::ExchangeSchema.response_additional_properties = false   # default: true
 
 The exceptions of a body hold: an object that declares no properties stays open, since there is
 nothing to close against, and a map, or an object with `values`, keeps the values schema it declared.
-The closing covers what the DSL builds. In a schema hash handed in, an object that composes or refers,
-by `allOf`, `oneOf`, `anyOf`, `if` and its branches, `dependentSchemas` or a `$ref`, is left as written
-with everything beneath it, since `additionalProperties` cannot see the keys those schemas declare;
-close such an object in the hash itself, with `unevaluatedProperties`, where it should be. Forms under another media type are untouched. With `response_validation` on `:warn` a closed response
+The closing covers what the DSL builds: it reads the keywords the DSL writes, `type`, `properties`,
+`required`, `items`, `additionalProperties`, `description`, `enum` and `format`. In a schema hash handed
+in, a schema that carries any other keyword, an `allOf`, a `$ref`, an `unevaluatedProperties`, a `title`,
+is left as written with everything beneath it, since that keyword may declare keys or schemas the closing
+would not see; close such a schema in the hash itself where it should be. Forms under another media type are untouched. With `response_validation` on `:warn` a closed response
 reports the keys it never declared without failing anyone, the way to find a key a serializer gained
 before `:strict` refuses it.
 

@@ -170,30 +170,33 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
       expect(decl.json_schema(201)['additionalProperties']).to be false
     end
 
-    it 'leaves an object that composes or refers as written, with all beneath it' do
+    it 'leaves a schema carrying a keyword the builder does not write as written, with all beneath it' do
       nested = { 'type' => 'object', 'properties' => { 'label' => { 'type' => 'string' } } }
-      composed = { 'type' => 'object', 'properties' => { 'id' => { 'type' => 'integer' }, 'tags' => nested }, 'allOf' => [{ 'properties' => { 'name' => { 'type' => 'string' } } }] }
+      written = {
+        200 => { 'type' => 'object', 'properties' => { 'id' => { 'type' => 'integer' }, 'tags' => nested }, 'allOf' => [{ 'properties' => { 'name' => { 'type' => 'string' } } }] },
+        201 => { 'oneOf' => [nested, { 'type' => 'string' }] },
+        202 => { 'properties' => { 'id' => { 'type' => 'integer' } }, '$ref' => '#/$defs/row' },
+        203 => { 'type' => 'object', 'properties' => { 'id' => { 'type' => 'integer' } }, 'unevaluatedProperties' => nested },
+        204 => { 'type' => 'array', 'prefixItems' => [nested], 'unevaluatedItems' => nested },
+        205 => { 'type' => 'object', 'title' => 'Row', 'properties' => { 'tags' => nested } }
+      }
       decl = described_class.new(:get, '/articles')
-      decl.response 200, values: composed
-      decl.response 201, values: { 'oneOf' => [nested, { 'type' => 'string' }] }
-      decl.response 202, values: { 'type' => 'object', 'properties' => { 'kind' => { 'type' => 'string' } }, 'if' => { 'required' => ['kind'] }, 'then' => nested }
-      decl.response 203, values: { 'properties' => { 'id' => { 'type' => 'integer' } }, '$ref' => '#/$defs/row' }
+      written.each { |status, schema| decl.response status, values: schema }
       decl.close_responses!
 
-      expect(decl.json_schema(200)['additionalProperties']).to eq composed
-      expect(decl.json_schema(201)['additionalProperties']).to eq('oneOf' => [nested, { 'type' => 'string' }])
-      expect(decl.json_schema(202)['additionalProperties']).not_to have_key('additionalProperties')
-      expect(decl.json_schema(203)['additionalProperties']).not_to have_key('additionalProperties')
+      written.each { |status, schema| expect(decl.json_schema(status)['additionalProperties']).to eq(schema), status.to_s }
       expect(JSONSchemer.schema(decl.json_schema(200)['additionalProperties']).valid?({ 'id' => 1, 'name' => 'a' })).to be true
     end
 
-    it 'leaves an object that says what its other keys take as it is' do
+    it 'closes a plain object inside a hash handed in, beside one left as written' do
       row = { 'type' => 'object', 'properties' => { 'name' => { 'type' => 'string' } } }
       decl = described_class.new(:get, '/articles')
-      decl.response 200, values: row.merge('unevaluatedProperties' => { 'type' => 'integer' })
+      decl.response 200, values: { 'type' => 'object', 'properties' => { 'plain' => row, 'composed' => row.merge('allOf' => [{ 'required' => ['name'] }]) } }
       decl.close_responses!
+      properties = decl.json_schema(200)['additionalProperties']['properties']
 
-      expect(decl.json_schema(200)['additionalProperties']).to eq row.merge('unevaluatedProperties' => { 'type' => 'integer' })
+      expect(properties['plain']['additionalProperties']).to be false
+      expect(properties['composed']).not_to have_key('additionalProperties')
     end
 
     it 'passes a boolean schema in a hash handed in as it is' do
