@@ -170,157 +170,30 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
       expect(decl.json_schema(201)['additionalProperties']).to be false
     end
 
-    it 'closes an object that composes with unevaluatedProperties, the composed schemas open at their top' do
-      part = { 'properties' => { 'name' => { 'type' => 'string' }, 'tags' => { 'type' => 'object', 'properties' => { 'label' => { 'type' => 'string' } } } }, 'required' => ['name'] }
+    it 'leaves an object that composes or refers as written, with all beneath it' do
+      nested = { 'type' => 'object', 'properties' => { 'label' => { 'type' => 'string' } } }
+      composed = { 'type' => 'object', 'properties' => { 'id' => { 'type' => 'integer' }, 'tags' => nested }, 'allOf' => [{ 'properties' => { 'name' => { 'type' => 'string' } } }] }
       decl = described_class.new(:get, '/articles')
-      decl.response 200, values: { 'type' => 'object', 'properties' => { 'id' => { 'type' => 'integer' } }, 'allOf' => [part] }
-      decl.close_responses!
-      values = decl.json_schema(200)['additionalProperties']
-
-      expect(values['unevaluatedProperties']).to be false
-      expect(values).not_to have_key('additionalProperties')
-      expect(values['allOf'].first).not_to have_key('additionalProperties')
-      expect(values['allOf'].first['properties']['tags']).not_to have_key('additionalProperties')
-
-      schemer = JSONSchemer.schema(values)
-      expect(schemer.valid?({ 'id' => 1, 'name' => 'a', 'tags' => { 'label' => 'x' } })).to be true
-      expect(schemer.valid?({ 'id' => 1, 'name' => 'a', 'extra' => true })).to be false
-    end
-
-    it 'leaves what a composition describes beneath its top open, two parts may share a nested object' do
-      decl = described_class.new(:get, '/articles')
-      decl.response 200, values: {
-        'allOf' => [
-          { 'properties' => { 'meta' => { 'type' => 'object', 'properties' => { 'a' => { 'type' => 'integer' } } } } },
-          { 'properties' => { 'meta' => { 'type' => 'object', 'properties' => { 'b' => { 'type' => 'integer' } } } } }
-        ]
-      }
-      decl.close_responses!
-      values = decl.json_schema(200)['additionalProperties']
-
-      expect(values['unevaluatedProperties']).to be false
-      expect(values['allOf'].map { |part| part['properties']['meta'] }).to all(satisfy { |meta| !meta.key?('additionalProperties') })
-      expect(JSONSchemer.schema(values).valid?({ 'meta' => { 'a' => 1, 'b' => 2 } })).to be true
-      expect(JSONSchemer.schema(values).valid?({ 'meta' => { 'a' => 1 }, 'extra' => true })).to be false
-    end
-
-    it 'leaves a composition inside a composition open, the outer top the one check' do
-      inner = { 'allOf' => [{ 'properties' => { 'name' => { 'type' => 'string' } }, 'required' => ['name'] }] }
-      decl = described_class.new(:get, '/articles')
-      decl.response 200, values: { 'type' => 'object', 'properties' => { 'id' => { 'type' => 'integer' } }, 'allOf' => [inner] }
-      decl.close_responses!
-      values = decl.json_schema(200)['additionalProperties']
-
-      expect(values['unevaluatedProperties']).to be false
-      expect(values['allOf'].first).to eq inner
-      expect(JSONSchemer.schema(values).valid?({ 'id' => 1, 'name' => 'a' })).to be true
-      expect(JSONSchemer.schema(values).valid?({ 'id' => 1, 'name' => 'a', 'extra' => true })).to be false
-    end
-
-    it 'closes an object with a conditional through unevaluatedProperties, the branches counted' do
-      decl = described_class.new(:get, '/articles')
-      decl.response 200, values: {
-        'type' => 'object',
-        'properties' => { 'kind' => { 'type' => 'string' } },
-        'if' => { 'properties' => { 'kind' => { 'const' => 'video' } } },
-        'then' => { 'properties' => { 'length' => { 'type' => 'integer' } }, 'required' => ['length'] }
-      }
-      decl.close_responses!
-      values = decl.json_schema(200)['additionalProperties']
-
-      expect(values['unevaluatedProperties']).to be false
-      expect(values).not_to have_key('additionalProperties')
-      expect(values['then']).not_to have_key('additionalProperties')
-
-      schemer = JSONSchemer.schema(values)
-      expect(schemer.valid?({ 'kind' => 'video', 'length' => 90 })).to be true
-      expect(schemer.valid?({ 'kind' => 'text' })).to be true
-      expect(schemer.valid?({ 'kind' => 'video', 'length' => 90, 'extra' => true })).to be false
-    end
-
-    it 'closes the values pattern properties take, the object that names no property left open' do
-      decl = described_class.new(:get, '/articles')
-      decl.response 200, values: {
-        'type' => 'object',
-        'patternProperties' => { '^p\\d+$' => { 'type' => 'object', 'properties' => { 'views' => { 'type' => 'integer' } } } }
-      }
-      decl.close_responses!
-      values = decl.json_schema(200)['additionalProperties']
-
-      expect(values['patternProperties'].values.first['additionalProperties']).to be false
-      expect(values).not_to have_key('additionalProperties')
-    end
-
-    it 'takes dependent schemas and a reference as composing' do
-      decl = described_class.new(:get, '/articles')
-      decl.response 200, values: {
-        'type' => 'object',
-        'properties' => { 'card' => { 'type' => 'string' } },
-        'dependentSchemas' => { 'card' => { 'properties' => { 'billing' => { 'type' => 'string' } } } }
-      }
-      decl.response 201, values: { 'properties' => { 'id' => { 'type' => 'integer' } }, '$ref' => '#/$defs/row' }
-      decl.response 202, values: { '$ref' => '#/$defs/row' }
+      decl.response 200, values: composed
+      decl.response 201, values: { 'oneOf' => [nested, { 'type' => 'string' }] }
+      decl.response 202, values: { 'type' => 'object', 'properties' => { 'kind' => { 'type' => 'string' } }, 'if' => { 'required' => ['kind'] }, 'then' => nested }
+      decl.response 203, values: { 'properties' => { 'id' => { 'type' => 'integer' } }, '$ref' => '#/$defs/row' }
       decl.close_responses!
 
-      dependent = decl.json_schema(200)['additionalProperties']
-      expect(dependent['unevaluatedProperties']).to be false
-      expect(JSONSchemer.schema(dependent).valid?({ 'card' => 'x', 'billing' => 'y' })).to be true
-      expect(JSONSchemer.schema(dependent).valid?({ 'card' => 'x', 'extra' => 1 })).to be false
-      expect(decl.json_schema(201)['additionalProperties']['unevaluatedProperties']).to be false
-      expect(decl.json_schema(201)['additionalProperties']).not_to have_key('additionalProperties')
-      expect(decl.json_schema(202)['additionalProperties']).to eq('$ref' => '#/$defs/row')
+      expect(decl.json_schema(200)['additionalProperties']).to eq composed
+      expect(decl.json_schema(201)['additionalProperties']).to eq('oneOf' => [nested, { 'type' => 'string' }])
+      expect(decl.json_schema(202)['additionalProperties']).not_to have_key('additionalProperties')
+      expect(decl.json_schema(203)['additionalProperties']).not_to have_key('additionalProperties')
+      expect(JSONSchemer.schema(decl.json_schema(200)['additionalProperties']).valid?({ 'id' => 1, 'name' => 'a' })).to be true
     end
 
-    it 'closes what unevaluatedProperties and unevaluatedItems declare, an assertion left as written' do
+    it 'leaves an object that says what its other keys take as it is' do
       row = { 'type' => 'object', 'properties' => { 'name' => { 'type' => 'string' } } }
       decl = described_class.new(:get, '/articles')
-      decl.response 200, values: { 'type' => 'object', 'unevaluatedProperties' => row }
-      decl.response 201, items: { 'type' => 'array', 'unevaluatedItems' => row, 'contains' => row }
+      decl.response 200, values: row.merge('unevaluatedProperties' => { 'type' => 'integer' })
       decl.close_responses!
-      items = decl.json_schema(201)['items']
 
-      expect(decl.json_schema(200)['additionalProperties']['unevaluatedProperties']).to eq row.merge('additionalProperties' => false)
-      expect(items['unevaluatedItems']).to eq row.merge('additionalProperties' => false)
-      expect(items['contains']).to eq row
-      expect(row).not_to have_key('additionalProperties')
-    end
-
-    it 'closes an object in a tuple position as it closes array items' do
-      decl = described_class.new(:get, '/articles')
-      decl.response 200, items: { 'type' => 'array', 'prefixItems' => [{ 'type' => 'object', 'properties' => { 'name' => { 'type' => 'string' } } }, { 'type' => 'integer' }] }
-      decl.close_responses!
-      tuple = decl.json_schema(200)['items']['prefixItems']
-
-      expect(tuple.first['additionalProperties']).to be false
-      expect(tuple.last).to eq('type' => 'integer')
-    end
-
-    it 'closes alternatives through their parent, so a key either side declares passes and no other' do
-      alternatives = [{ 'type' => 'object', 'properties' => { 'name' => { 'type' => 'string' } }, 'required' => ['name'] }, { 'type' => 'string' }]
-      decl = described_class.new(:get, '/articles')
-      decl.response 200, items: { 'type' => %w[object string], 'properties' => { 'id' => { 'type' => 'integer' } }, 'oneOf' => alternatives }
-      decl.response 201, values: { 'anyOf' => alternatives }
-      decl.close_responses!
-      items = decl.json_schema(200)['items']
-
-      expect(items['unevaluatedProperties']).to be false
-      expect(items['oneOf']).to eq alternatives
-      expect(decl.json_schema(201)['additionalProperties']).to eq('anyOf' => alternatives, 'unevaluatedProperties' => false)
-
-      schemer = JSONSchemer.schema(items)
-      expect(schemer.valid?({ 'id' => 1, 'name' => 'a' })).to be true
-      expect(schemer.valid?('plain')).to be true
-      expect(schemer.valid?({ 'id' => 1, 'name' => 'a', 'extra' => true })).to be false
-    end
-
-    it 'leaves a composition that names no property open' do
-      decl = described_class.new(:get, '/articles')
-      decl.response 200, values: { 'allOf' => [{ 'type' => 'object' }] }
-      decl.response 201, items: { 'oneOf' => [{ 'type' => 'string' }, { 'type' => 'integer' }] }
-      decl.close_responses!
-      expect(decl.json_schema(200)['additionalProperties']).to eq('allOf' => [{ 'type' => 'object' }])
-      expect(decl.json_schema(201)['items']).to eq('oneOf' => [{ 'type' => 'string' }, { 'type' => 'integer' }])
-      expect(JSONSchemer.schema(decl.json_schema(200)['additionalProperties']).valid?({ 'theme' => 'dark' })).to be true
+      expect(decl.json_schema(200)['additionalProperties']).to eq row.merge('unevaluatedProperties' => { 'type' => 'integer' })
     end
 
     it 'passes a boolean schema in a hash handed in as it is' do
