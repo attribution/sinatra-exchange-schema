@@ -278,15 +278,22 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
     end
   end
 
-  describe '#additional_properties' do
+  describe '#request_additional_properties' do
     it 'defaults to nil so the controller or app decides' do
       decl = described_class.new(:post, '/articles')
-      expect(decl.additional_properties).to be_nil
+      expect(decl.request_additional_properties).to be_nil
     end
 
     it 'stores an explicit opt-out' do
       decl = described_class.new(:post, '/articles')
+      decl.request_additional_properties true
+      expect(decl.request_additional_properties).to be true
+    end
+
+    it 'answers to additional_properties, its alias' do
+      decl = described_class.new(:post, '/articles')
       decl.additional_properties true
+      expect(decl.request_additional_properties).to be true
       expect(decl.additional_properties).to be true
     end
   end

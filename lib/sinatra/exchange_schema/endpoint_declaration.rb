@@ -46,11 +46,12 @@ module Sinatra
         @response_validation = value
       end
 
-      def additional_properties(value = :_unset)
-        return @additional_properties if value == :_unset
+      def request_additional_properties(value = :_unset)
+        return @request_additional_properties if value == :_unset
 
-        @additional_properties = value
+        @request_additional_properties = value
       end
+      alias additional_properties request_additional_properties
 
       def response_additional_properties(value = :_unset)
         return @response_additional_properties if value == :_unset
@@ -108,7 +109,7 @@ module Sinatra
       end
 
       # Rejects body keys this endpoint never declared. Called by the +endpoint+ DSL once the
-      # block has run, so it applies whether +body+ came before or after +additional_properties+.
+      # block has run, so it applies whether +body+ came before or after +request_additional_properties+.
       #
       # Only the top level closes. Nested objects stay open: +object :settings+ with no block
       # declares no properties at all, so closing it would reject every key inside. A body that

@@ -1217,7 +1217,7 @@ describe Sinatra::ExchangeSchema do
           end
 
           endpoint :post, '/opted_out' do
-            additional_properties true
+            request_additional_properties true
             body { string :name, required: true }
           end
 
@@ -1257,7 +1257,7 @@ describe Sinatra::ExchangeSchema do
       let(:app_class) do
         Class.new(Sinatra::Base) do
           register Sinatra::ExchangeSchema
-          set :additional_properties, true
+          set :request_additional_properties, true
 
           endpoint :post, '/inherits_controller' do
             body { string :name, required: true }
@@ -1287,15 +1287,81 @@ describe Sinatra::ExchangeSchema do
       end
 
       around do |example|
-        Sinatra::ExchangeSchema.additional_properties = true
+        Sinatra::ExchangeSchema.request_additional_properties = true
         example.run
       ensure
-        Sinatra::ExchangeSchema.additional_properties = false
+        Sinatra::ExchangeSchema.request_additional_properties = false
       end
 
       it 'accepts an undeclared key' do
         post_undeclared '/inherits_app'
         expect(last_response.status).to eq(200)
+      end
+    end
+
+    context 'under the alias additional_properties' do
+      let(:app_class) do
+        Class.new(Sinatra::Base) do
+          register Sinatra::ExchangeSchema
+          set :additional_properties, true
+
+          endpoint :post, '/inherits_controller' do
+            body { string :name, required: true }
+          end
+
+          endpoint :post, '/closed_again' do
+            additional_properties false
+            body { string :name, required: true }
+          end
+
+          post('/inherits_controller') { 'ok' }
+          post('/closed_again')        { 'ok' }
+        end
+      end
+
+      it 'reads a controller that sets it' do
+        post_undeclared '/inherits_controller'
+        expect(last_response.status).to eq(200)
+      end
+
+      it 'reads an endpoint that declares it' do
+        expect { post_undeclared '/closed_again' }.
+          to raise_error(Sinatra::ExchangeSchema::RequestValidator::SchemaValidationError)
+      end
+
+      it 'is the app-wide setting under both names' do
+        Sinatra::ExchangeSchema.additional_properties = true
+        expect(Sinatra::ExchangeSchema.request_additional_properties).to be true
+        expect(Sinatra::ExchangeSchema.additional_properties).to be true
+      ensure
+        Sinatra::ExchangeSchema.request_additional_properties = false
+      end
+
+      it 'resolves under either name' do
+        declaration = app_class.endpoint_declarations.first
+        expect(Sinatra::ExchangeSchema.effective_mode(declaration, :additional_properties, app_class.settings)).to be true
+        expect(Sinatra::ExchangeSchema.effective_mode(declaration, :request_additional_properties, app_class.settings)).to be true
+      end
+    end
+
+    context 'when a controller sets the setting and its alias' do
+      let(:app_class) do
+        Class.new(Sinatra::Base) do
+          register Sinatra::ExchangeSchema
+          set :request_additional_properties, false
+          set :additional_properties, true
+
+          endpoint :post, '/closed' do
+            body { string :name, required: true }
+          end
+
+          post('/closed') { 'ok' }
+        end
+      end
+
+      it 'goes by the setting' do
+        expect { post_undeclared '/closed' }.
+          to raise_error(Sinatra::ExchangeSchema::RequestValidator::SchemaValidationError)
       end
     end
   end
