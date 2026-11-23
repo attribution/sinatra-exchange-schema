@@ -46,10 +46,17 @@ module Sinatra
         @response_validation = value
       end
 
-      def additional_properties(value = :_unset)
-        return @additional_properties if value == :_unset
+      def request_additional_properties(value = :_unset)
+        return @request_additional_properties if value == :_unset
 
-        @additional_properties = value
+        @request_additional_properties = value
+      end
+      alias additional_properties request_additional_properties
+
+      def response_additional_properties(value = :_unset)
+        return @response_additional_properties if value == :_unset
+
+        @response_additional_properties = value
       end
 
       def openapi_file(value = :_unset)
@@ -102,7 +109,7 @@ module Sinatra
       end
 
       # Rejects body keys this endpoint never declared. Called by the +endpoint+ DSL once the
-      # block has run, so it applies whether +body+ came before or after +additional_properties+.
+      # block has run, so it applies whether +body+ came before or after +request_additional_properties+.
       #
       # Only the top level closes. Nested objects stay open: +object :settings+ with no block
       # declares no properties at all, so closing it would reject every key inside. A body that
@@ -112,6 +119,32 @@ module Sinatra
 
         @body_schema = @body_schema.merge('additionalProperties' => false)
       end
+
+      # Closes every object a JSON form declares to the keys it names: nested objects, array items
+      # and map values included, since a response's undeclared keys sit at any depth. An object
+      # that names no property stays open, as in a body, and a map keeps its values schema. The
+      # walk reads the builder's own keywords and no other: a schema that carries another, which
+      # only a hash handed in can, is left as written with everything beneath it, since that
+      # keyword may declare keys or schemas the walk would not see. The forms are rebuilt, so a
+      # schema handed in as +values:+ or +items:+ is not edited.
+      def close_responses!
+        @json_schemas = @json_schemas.transform_values { |schema| closed(schema) }
+      end
+
+      def closed(schema)
+        return schema unless schema.is_a?(Hash) && (schema.keys - Builder::KEYWORDS).empty?
+
+        closed = schema.dup
+        properties = schema['properties']
+        closed['properties'] = properties.transform_values { |property| closed(property) } if properties.is_a?(Hash)
+        closed['items'] = closed(schema['items']) if schema['items'].is_a?(Hash)
+        closed['additionalProperties'] = closed(schema['additionalProperties']) if schema['additionalProperties'].is_a?(Hash)
+
+        named = properties.is_a?(Hash) && !properties.empty?
+        closed['additionalProperties'] = false if named && !schema.key?('additionalProperties')
+        closed
+      end
+      private :closed
 
       # Define a JSON Schema for query-string parameters.
       # The block is evaluated in the context of a ExchangeSchema::Builder.

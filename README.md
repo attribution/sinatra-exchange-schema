@@ -415,7 +415,8 @@ Each concern accepts one of three modes:
 | `:warn`   | Log a warning **(default)**    |
 | `:strict` | Log a warning **and** raise    |
 
-A fourth setting, `additional_properties`, is a boolean rather than a mode — see below.
+Two more settings, `request_additional_properties` and `response_additional_properties`, are booleans rather than
+modes — see below.
 
 ### What Gets Validated
 
@@ -440,17 +441,20 @@ top-level array with `items:`; a request body has no such form yet
 JSON Schema allows any key a `body` did not declare, so without this an endpoint answers 200 to
 `descripton` and does nothing with it — the client is never told it misspelled anything.
 
-`additional_properties` is the JSON Schema keyword of the same name, lifted to a setting. It
-defaults to `false`, so an undeclared key is a violation; an app that is not ready for that turns
-it back on:
+`request_additional_properties` is the JSON Schema keyword `additionalProperties`, lifted to a setting
+for the request body. It defaults to `false`, so an undeclared key is a violation; an app that is not
+ready for that turns it back on:
 
 ```ruby
-Sinatra::ExchangeSchema.additional_properties = true   # default: false
+Sinatra::ExchangeSchema.request_additional_properties = true   # default: false
 ```
+
+`additional_properties` is an alias of it at every level: the app-wide accessor, a controller's `set`
+and the endpoint block.
 
 A body that declares `values` has said what its other keys take, and keeps that whatever the setting.
 
-This is orthogonal to the modes above: `additional_properties` decides what counts as a
+This is orthogonal to the modes above: `request_additional_properties` decides what counts as a
 violation, `request_validation` decides what happens to one. Leaving it closed while
 `request_validation` is `:warn` reports undeclared keys without rejecting them — the way to find
 out what real clients send before turning the screw.
@@ -468,9 +472,43 @@ do not control — opts out for itself:
 
 ```ruby
 endpoint :post, '/webhook' do
-  additional_properties true
+  request_additional_properties true
   body do
     string :event
+  end
+end
+```
+
+### Undeclared Response Keys
+
+A response object is open the same way: one that declares `id` and `name` passes a payload that also
+carries `password_hash`, so the schema cannot promise a reader that the keys it lists are all there
+are. `response_additional_properties` closes every object a JSON response declares, nested objects,
+array items and map values included, as `additionalProperties: false` in the schema the validator
+checks and in the generated OpenAPI. It defaults to `true`, open, so an app turns it off where its
+declarations are complete:
+
+```ruby
+Sinatra::ExchangeSchema.response_additional_properties = false   # default: true
+```
+
+The exceptions of a body hold: an object that declares no properties stays open, since there is
+nothing to close against, and a map, or an object with `values`, keeps the values schema it declared.
+The closing covers what the DSL builds: it reads the keywords the DSL writes, `type`, `properties`,
+`required`, `items`, `additionalProperties`, `description`, `enum` and `format`. In a schema hash handed
+in, a schema that carries any other keyword, an `allOf`, a `$ref`, an `unevaluatedProperties`, a `title`,
+is left as written with everything beneath it, since that keyword may declare keys or schemas the closing
+would not see; close such a schema in the hash itself where it should be. Forms under another media type are untouched. With `response_validation` on `:warn` a closed response
+reports the keys it never declared without failing anyone, the way to find a key a serializer gained
+before `:strict` refuses it.
+
+An endpoint whose response is open by design opts out for itself:
+
+```ruby
+endpoint :get, '/settings' do
+  response_additional_properties true
+  response 200 do
+    string :theme
   end
 end
 ```
@@ -485,7 +523,8 @@ Settings are resolved with **endpoint > controller > app-wide** precedence.
 Sinatra::ExchangeSchema.request_validation    = :strict
 Sinatra::ExchangeSchema.response_validation   = :off
 Sinatra::ExchangeSchema.missing_schema        = :warn
-Sinatra::ExchangeSchema.additional_properties = true
+Sinatra::ExchangeSchema.request_additional_properties  = true
+Sinatra::ExchangeSchema.response_additional_properties = false
 ```
 
 **Per-controller** — overrides the app-wide default for a single Sinatra class:
@@ -494,7 +533,8 @@ Sinatra::ExchangeSchema.additional_properties = true
 class Api < Sinatra::Base
   register Sinatra::ExchangeSchema
   set :request_validation, :strict
-  set :additional_properties, true
+  set :request_additional_properties, true
+  set :response_additional_properties, false
 end
 ```
 
@@ -504,7 +544,8 @@ end
 endpoint :post, '/articles' do
   request_validation :strict
   response_validation :off
-  additional_properties true
+  request_additional_properties true
+  response_additional_properties false
   body do
     string :name, required: true
   end
@@ -512,11 +553,11 @@ end
 ```
 
 Leaving a level unset means "inherit"; an explicit value at a lower level wins over the one
-above it, including `additional_properties true` under an app-wide `false`. `missing_schema` has no per-endpoint level — it fires precisely when no
+above it, including `request_additional_properties true` under an app-wide `false`. `missing_schema` has no per-endpoint level — it fires precisely when no
 declaration matched.
 
-`additional_properties`, `endpoint_security` and `openapi_file` are read once, when the endpoint is declared, so
-their `set` must appear above the `endpoint` blocks it should affect. The validation modes are read per request and
+`request_additional_properties`, `response_additional_properties`, `endpoint_security` and `openapi_file` are read once,
+when the endpoint is declared, so their `set` must appear above the `endpoint` blocks it should affect. The validation modes are read per request and
 can be set anywhere.
 
 ### Strict Mode and Clients

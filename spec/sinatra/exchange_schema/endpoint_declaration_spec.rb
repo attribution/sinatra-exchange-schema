@@ -84,15 +84,160 @@ describe Sinatra::ExchangeSchema::EndpointDeclaration do
     end
   end
 
-  describe '#additional_properties' do
+  describe '#close_responses!' do
+    it 'closes every object that declares properties: nested ones, array items and map values too' do
+      decl = described_class.new(:get, '/articles')
+      decl.response 200 do
+        string :id, required: true
+        object :meta do
+          string :source
+        end
+        array :tags do
+          string :name
+        end
+        map :totals do
+          integer :views
+        end
+      end
+      decl.close_responses!
+      schema = decl.json_schema(200)
+      expect(schema['additionalProperties']).to be false
+      expect(schema['properties']['meta']['additionalProperties']).to be false
+      expect(schema['properties']['tags']['items']['additionalProperties']).to be false
+      expect(schema['properties']['totals']['additionalProperties']['additionalProperties']).to be false
+      expect(schema['required']).to eq ['id']
+    end
+
+    it 'leaves an object without properties open and a declared values schema as it is' do
+      decl = described_class.new(:get, '/articles')
+      decl.response 200 do
+        object :settings
+        map :counts, values: :integer
+        object :mixed do
+          string :total
+          values :integer
+        end
+      end
+      decl.close_responses!
+      schema = decl.json_schema(200)
+      expect(schema['properties']['settings']).to eq('type' => 'object')
+      expect(schema['properties']['counts']['additionalProperties']).to eq('type' => 'integer')
+      expect(schema['properties']['mixed']['additionalProperties']).to eq('type' => 'integer')
+    end
+
+    it 'closes an array response and a map response through their elements' do
+      decl = described_class.new(:get, '/articles')
+      decl.response 200, items: :object do
+        string :name
+      end
+      decl.response 201, values: :object do
+        string :name
+      end
+      decl.close_responses!
+      expect(decl.json_schema(200)['items']['additionalProperties']).to be false
+      expect(decl.json_schema(200)).not_to have_key('additionalProperties')
+      expect(decl.json_schema(201)['additionalProperties']['additionalProperties']).to be false
+      expect(decl.json_schema(201)).not_to have_key('properties')
+    end
+
+    it 'leaves a schema handed in untouched and the other forms alone' do
+      row = { 'type' => 'object', 'properties' => { 'name' => { 'type' => 'string' } } }.freeze
+      decl = described_class.new(:get, '/articles')
+      decl.response 200, values: row
+      decl.response 200, content: 'text/csv'
+      decl.close_responses!
+      expect(decl.json_schema(200)['additionalProperties']['additionalProperties']).to be false
+      expect(row).not_to have_key('additionalProperties')
+      expect(decl.response_forms(200)['text/csv']).to eq('type' => 'string')
+    end
+
+    it 'does nothing when no response is declared' do
+      decl = described_class.new(:get, '/articles')
+      expect { decl.close_responses! }.not_to raise_error
+      expect(decl.response_schemas).to eq({})
+    end
+
+    it 'leaves a response without a block and an object with an empty block open' do
+      decl = described_class.new(:get, '/articles')
+      decl.response 200
+      decl.response 201 do
+        object :settings do
+        end
+      end
+      decl.close_responses!
+      expect(decl.json_schema(200)).not_to have_key('additionalProperties')
+      expect(decl.json_schema(201)['properties']['settings']).not_to have_key('additionalProperties')
+      expect(decl.json_schema(201)['additionalProperties']).to be false
+    end
+
+    it 'leaves a schema carrying a keyword the builder does not write as written, with all beneath it' do
+      nested = { 'type' => 'object', 'properties' => { 'label' => { 'type' => 'string' } } }
+      written = {
+        200 => { 'type' => 'object', 'properties' => { 'id' => { 'type' => 'integer' }, 'tags' => nested }, 'allOf' => [{ 'properties' => { 'name' => { 'type' => 'string' } } }] },
+        201 => { 'oneOf' => [nested, { 'type' => 'string' }] },
+        202 => { 'properties' => { 'id' => { 'type' => 'integer' } }, '$ref' => '#/$defs/row' },
+        203 => { 'type' => 'object', 'properties' => { 'id' => { 'type' => 'integer' } }, 'unevaluatedProperties' => nested },
+        204 => { 'type' => 'array', 'prefixItems' => [nested], 'unevaluatedItems' => nested },
+        205 => { 'type' => 'object', 'title' => 'Row', 'properties' => { 'tags' => nested } }
+      }
+      decl = described_class.new(:get, '/articles')
+      written.each { |status, schema| decl.response status, values: schema }
+      decl.close_responses!
+
+      written.each { |status, schema| expect(decl.json_schema(status)['additionalProperties']).to eq(schema), status.to_s }
+      expect(JSONSchemer.schema(decl.json_schema(200)['additionalProperties']).valid?({ 'id' => 1, 'name' => 'a' })).to be true
+    end
+
+    it 'closes a plain object inside a hash handed in, beside one left as written' do
+      row = { 'type' => 'object', 'properties' => { 'name' => { 'type' => 'string' } } }
+      decl = described_class.new(:get, '/articles')
+      decl.response 200, values: { 'type' => 'object', 'properties' => { 'plain' => row, 'composed' => row.merge('allOf' => [{ 'required' => ['name'] }]) } }
+      decl.close_responses!
+      properties = decl.json_schema(200)['additionalProperties']['properties']
+
+      expect(properties['plain']['additionalProperties']).to be false
+      expect(properties['composed']).not_to have_key('additionalProperties')
+    end
+
+    it 'passes a boolean schema in a hash handed in as it is' do
+      decl = described_class.new(:get, '/articles')
+      decl.response 200, values: { 'type' => 'object', 'properties' => { 'name' => true, 'tags' => { 'type' => 'array', 'items' => false } } }
+      decl.close_responses!
+      values = decl.json_schema(200)['additionalProperties']
+      expect(values['properties']).to eq('name' => true, 'tags' => { 'type' => 'array', 'items' => false })
+      expect(values['additionalProperties']).to be false
+    end
+  end
+
+  describe '#response_additional_properties' do
+    it 'defaults to nil so the controller or app decides' do
+      decl = described_class.new(:get, '/articles')
+      expect(decl.response_additional_properties).to be_nil
+    end
+
+    it 'stores an explicit value' do
+      decl = described_class.new(:get, '/articles')
+      decl.response_additional_properties false
+      expect(decl.response_additional_properties).to be false
+    end
+  end
+
+  describe '#request_additional_properties' do
     it 'defaults to nil so the controller or app decides' do
       decl = described_class.new(:post, '/articles')
-      expect(decl.additional_properties).to be_nil
+      expect(decl.request_additional_properties).to be_nil
     end
 
     it 'stores an explicit opt-out' do
       decl = described_class.new(:post, '/articles')
+      decl.request_additional_properties true
+      expect(decl.request_additional_properties).to be true
+    end
+
+    it 'answers to additional_properties, its alias' do
+      decl = described_class.new(:post, '/articles')
       decl.additional_properties true
+      expect(decl.request_additional_properties).to be true
       expect(decl.additional_properties).to be true
     end
   end

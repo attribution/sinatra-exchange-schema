@@ -5,6 +5,35 @@ describe Sinatra::ExchangeSchema::Builder do
 
   let(:builder) { described_class.new }
 
+  describe 'KEYWORDS' do
+    def keywords(schema, found = [])
+      return found unless schema.is_a?(Hash)
+
+      found.concat(schema.keys)
+      (schema['properties'] || {}).each_value { |property| keywords(property, found) }
+      keywords(schema['items'], found)
+      keywords(schema['additionalProperties'], found)
+      found
+    end
+
+    it 'lists every keyword the builder writes, so the response closing reads all it builds' do
+      builder.string :name, required: true, enum: %w[a b], format: :date, nullable: true, description: 'A name'
+      builder.integer :count
+      builder.number :rate
+      builder.boolean :on
+      builder.any :raw, description: 'As sent'
+      builder.array(:tags, description: 'Tags') { string :label }
+      builder.array :ids, items: :integer
+      builder.object(:meta, nullable: true) { string :source }
+      builder.object :open
+      builder.map :totals, values: :integer
+      builder.map(:rows) { integer :views }
+      builder.values { integer :other }
+
+      expect(keywords(builder.to_json_schema).uniq - described_class::KEYWORDS).to eq []
+    end
+  end
+
   describe 'simple types' do
     before do
       builder.string :name, required: true

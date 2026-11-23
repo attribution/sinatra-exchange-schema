@@ -4,7 +4,9 @@
 # app-wide, per-controller, and per-endpoint.
 #
 # Each validation concern (+request_validation+, +response_validation+,
-# +missing_schema+) can be set to +:off+, +:warn+, or +:strict+.
+# +missing_schema+) can be set to +:off+, +:warn+, or +:strict+. Two booleans close what the
+# declarations leave open: +request_additional_properties+ a request body, also answering to
+# +additional_properties+, and +response_additional_properties+ every object a response declares.
 #
 # == Usage
 #
@@ -39,10 +41,14 @@ module Sinatra
     class MissingEndpointSchemaError < StandardError; end
 
     VALID_MODES = %i[off warn strict].freeze
+    SETTING_ALIASES = { request_additional_properties: :additional_properties }.freeze
 
     class << self
       attr_reader :request_validation, :response_validation, :missing_schema
-      attr_accessor :additional_properties
+      attr_accessor :request_additional_properties, :response_additional_properties
+
+      alias additional_properties request_additional_properties
+      alias additional_properties= request_additional_properties=
 
       def request_validation=(mode)
         validate_mode!(mode)
@@ -72,7 +78,8 @@ module Sinatra
     self.request_validation = :warn
     self.response_validation = :warn
     self.missing_schema = :warn
-    self.additional_properties = false
+    self.request_additional_properties = false
+    self.response_additional_properties = true
 
     # Called when a Sinatra app registers this extension.
     def self.registered(app)
@@ -81,7 +88,9 @@ module Sinatra
       app.set :request_validation, nil
       app.set :response_validation, nil
       app.set :missing_schema, nil
+      app.set :request_additional_properties, nil
       app.set :additional_properties, nil
+      app.set :response_additional_properties, nil
       app.set :openapi_file, nil
 
       app.before do
@@ -202,14 +211,19 @@ module Sinatra
     # Resolve the effective value of a setting, checking endpoint > controller > app-wide.
     # +nil+ at a level means "inherit", so a per-endpoint +false+ still wins over the app default.
     # +missing_schema+ has no endpoint level: it fires precisely when no declaration matched.
+    # A setting that goes by an alias is read under both names: its own first, so a controller that
+    # sets both is ruled by the one the gem documents.
     def self.effective_mode(declaration, concern, controller_settings)
+      concern = SETTING_ALIASES.key(concern) || concern
       unless concern == :missing_schema
         endpoint_val = declaration&.send(concern)
         return endpoint_val unless endpoint_val.nil?
       end
 
-      controller_val = controller_settings.respond_to?(concern) ? controller_settings.send(concern) : nil
-      return controller_val unless controller_val.nil?
+      [concern, SETTING_ALIASES[concern]].compact.each do |name|
+        controller_val = controller_settings.respond_to?(name) ? controller_settings.send(name) : nil
+        return controller_val unless controller_val.nil?
+      end
 
       send(concern)
     end
@@ -248,7 +262,8 @@ module Sinatra
       if !decl.openapi_file && settings.respond_to?(:openapi_file) && settings.openapi_file
         decl.openapi_file(settings.openapi_file)
       end
-      decl.close_body! unless ExchangeSchema.effective_mode(decl, :additional_properties, settings)
+      decl.close_body! unless ExchangeSchema.effective_mode(decl, :request_additional_properties, settings)
+      decl.close_responses! unless ExchangeSchema.effective_mode(decl, :response_additional_properties, settings)
       endpoint_declarations << decl
     end
   end
